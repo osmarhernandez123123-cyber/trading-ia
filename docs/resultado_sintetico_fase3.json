@@ -1,0 +1,39 @@
+{
+  "naturaleza": "EXCLUSIVAMENTE SINTETICA; no validaci\u00f3n hist\u00f3rica ni evidencia predictiva",
+  "dataset_sha256": "43c7e47c71a603fedaac256dd31427bbbaae50cac99b93787bd32c97a54f0705",
+  "python": "3.12.14",
+  "operaciones_sinteticas": 19,
+  "comparacion_dos_ejecuciones": "Hashes l\u00f3gicos id\u00e9nticos en las seis tablas",
+  "tablas": [
+    {
+      "nombre": "indicadores",
+      "filas": 390,
+      "sha256_logico": "5a92c04aa438fa127315764a0cd0fbce5da1f2af9431581876dcc1e78d136491"
+    },
+    {
+      "nombre": "senales",
+      "filas": 390,
+      "sha256_logico": "a908b15c5796349db1b010c194447dfe1f88e14497edaf9deb379a2bcbf23fab"
+    },
+    {
+      "nombre": "candidatas",
+      "filas": 34,
+      "sha256_logico": "9ac90cb749c951f8e4692960f18a5f88785a11de07ab160104cb7853d8af399a"
+    },
+    {
+      "nombre": "operaciones",
+      "filas": 19,
+      "sha256_logico": "53d581be1a7706e131e774736b540ea217ab73f6832bba338ad602a85bb41ea0"
+    },
+    {
+      "nombre": "rechazos",
+      "filas": 15,
+      "sha256_logico": "170fbbb32994f1820a15e073387742de965f6c8fc1c070099fbf4e9f40d91716"
+    },
+    {
+      "nombre": "capital",
+      "filas": 390,
+      "sha256_logico": "3ab59717b7fea10d52a8da7618d206d817ec3108aa8ca1fb9f30713a5cc102bd"
+    }
+  ]
+}

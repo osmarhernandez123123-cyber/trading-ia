@@ -22,7 +22,7 @@ python -m pip check
 
 El repositorio es privado y requiere acceso autorizado a GitHub.
 Las versiones de dependencias proceden del entorno local existente.
-Su instalación en un entorno limpio todavía no se ha validado;
+Su instalación en Python 3.12.14/Linux se validó en Fase 3;
 `requirements-lock.txt` fija restricciones transitivas sin hashes.
 
 ## Configuración y datos
@@ -111,6 +111,19 @@ de instalación. Revisar cada script antes de ejecutarlo desde la raíz del proy
 puede consultar servicios externos o sobrescribir datos y resultados locales.
 `main.py` consulta la cuenta de Alpaca paper; no es un punto de entrada al backtest.
 
-La contabilidad de ejecución, slippage y cálculo de R sigue pendiente de auditoría.
+La contabilidad de V3.1, slippage y R dispone de pruebas sintéticas; falta validación histórica real.
 No activar actualizaciones automáticas ni envío de órdenes durante la preparación
 del entorno de desarrollo.
+
+## Fase 3: investigación offline
+
+Pipeline completo desde un Parquet identificado por SHA-256, sin acceso a red:
+
+```bash
+python -m trading_ia.investigacion --help
+```
+
+Consultar [procedimiento reproducible](docs/EJECUCION_FASE_3.md) y
+[informe técnico](AUDITORIA_FASE_3.md). Motor en memoria en
+`trading_ia.backtest`; transformaciones compartidas en `trading_ia.etapas`.
+La evidencia disponible es exclusivamente sintética.

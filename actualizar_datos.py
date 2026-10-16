@@ -118,6 +118,9 @@ with open(BLOQUEO, "w") as lock:
 
     exigir_integridad_original(actualizado.reset_index(), "actualizar_datos.py")
 
+    if errores:
+        raise RuntimeError(f"Actualizacion abortada sin reemplazar historico. Fallaron: {errores}")
+
     actualizado.to_parquet(TEMPORAL)
     TEMPORAL.replace(ARCHIVO)
 
@@ -125,8 +128,3 @@ with open(BLOQUEO, "w") as lock:
     print(actualizado.groupby(level="symbol").size())
     print("Duplicados:", actualizado.index.duplicated().sum())
     print("Archivo actualizado:", ARCHIVO)
-
-    if errores:
-        raise RuntimeError(
-            f"Actualizacion parcial. Fallaron: {errores}"
-        )

@@ -52,3 +52,6 @@ Thumbs.db
 # Datos de mercado y resultados derivados: redistribucion no confirmada.
 # Conservar localmente; no incluir en Git hasta verificar la licencia.
 *.parquet
+
+# Ejecuciones privadas reproducibles (incluyen metadatos y logs)
+runs/

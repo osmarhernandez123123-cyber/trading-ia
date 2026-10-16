@@ -1,5 +1,6 @@
 
 import os
+from pathlib import Path
 from datetime import datetime, timedelta, timezone
 
 import pandas as pd
@@ -64,5 +65,8 @@ print(datos.groupby(level="symbol").size())
 print("\nDuplicados:", datos.index.duplicated().sum())
 print("Valores faltantes:", datos.isna().sum().sum())
 
-datos.to_parquet("datos_acciones_30dias.parquet")
+destino = Path(__file__).resolve().parent / "datos_acciones_30dias.parquet"
+temporal = destino.with_suffix(".tmp.parquet")
+datos.to_parquet(temporal)
+temporal.replace(destino)
 print("\nArchivo actualizado correctamente")
