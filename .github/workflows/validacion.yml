@@ -1,11 +1,11 @@
 name: Validación sintética
 
+# Validación continua: una ejecución por actualización de PR y otra al integrar
+# en main. No duplicar runs push+pull_request en ramas codex/**.
 on:
   push:
     branches:
       - main
-      - codex/fase-3-validacion
-      - 'codex/**'
   pull_request:
     branches:
       - main
@@ -15,7 +15,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: validacion-${{ github.workflow }}-${{ github.ref }}
+  group: validacion-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 jobs:
