@@ -1,11 +1,10 @@
 name: Codex - desarrollo autónomo (opt-in)
 
-# Las tareas programadas se ejecutan sobre main. Sin OPENAI_API_KEY se
-# omiten de forma segura, sin gastos de API ni fallos de CI.
+# DESHABILITADO POR DECISIÓN DEL USUARIO: no usar API con cobro separado.
+# No hay ejecuciones programadas. Ni siquiera la activación manual ejecuta
+# jobs mientras el bloqueo explícito de preflight siga vigente.
 on:
   workflow_dispatch:
-  schedule:
-    - cron: '17 6 * * *'
 
 permissions:
   contents: read
@@ -16,6 +15,7 @@ concurrency:
 
 jobs:
   preflight:
+    if: ${{ false }} # API de pago deshabilitada explícitamente
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:
