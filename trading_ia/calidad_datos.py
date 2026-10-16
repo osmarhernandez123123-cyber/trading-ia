@@ -131,6 +131,11 @@ def validar_ohlcv(
         raise ValueError(f"Columnas faltantes: {sorted(faltantes)}")
     df = datos.copy()
     incidencias: list[Incidencia] = []
+    if df.empty:
+        incidencias.append(Incidencia("DATASET_VACIO", "ERROR", 1, "No hay observaciones"))
+    simbolo_invalido = df["symbol"].isna() | df["symbol"].astype(str).str.strip().eq("")
+    if simbolo_invalido.any():
+        incidencias.append(Incidencia("SIMBOLO_INVALIDO", "ERROR", int(simbolo_invalido.sum()), "Símbolo ausente o vacío"))
     timestamp_original = pd.to_datetime(df["timestamp"], utc=True, errors="coerce")
     nat = int(timestamp_original.isna().sum())
     if nat:
@@ -275,6 +280,14 @@ def validar_ohlcv(
     for simbolo, grupo in con_timestamp.sort_values(["symbol", "timestamp"]).groupby("symbol"):
         continuidad = grupo["timestamp"].diff().eq(pd.Timedelta(minutes=1))
         saltos = grupo["close"].pct_change(fill_method=None).abs().gt(umbral_salto) & continuidad
+        # Un split puede suceder entre sesiones: la continuidad de 60s no lo detecta.
+        dias = grupo["timestamp"].dt.tz_convert(ZONA_NY).dt.date
+        salto_sesion = dias.ne(dias.shift(1)) & grupo["open"].div(grupo["close"].shift(1)).sub(1).abs().ge(umbral_salto)
+        if salto_sesion.any():
+            incidencias.append(Incidencia(
+                "SALTO_ENTRE_SESIONES", "ADVERTENCIA", int(salto_sesion.sum()),
+                "Posible corporate action o gap real: revisar ajuste y procedencia; no se ajustan precios", str(simbolo),
+            ))
         if saltos.any():
             incidencias.append(Incidencia(
                 "SALTO_PRECIO", "ADVERTENCIA", int(saltos.sum()),

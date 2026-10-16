@@ -110,6 +110,9 @@ with open(BLOQUEO, "w") as lock:
             errores.append(simbolo)
             print(f"Error en {simbolo}: {error}")
 
+    if errores:
+        raise RuntimeError(f'Actualizacion cancelada; snapshot anterior conservado. Fallaron: {errores}')
+
     actualizado = pd.concat(resultados)
 
     actualizado = actualizado[
@@ -125,8 +128,3 @@ with open(BLOQUEO, "w") as lock:
     print(actualizado.groupby(level="symbol").size())
     print("Duplicados:", actualizado.index.duplicated().sum())
     print("Archivo actualizado:", ARCHIVO)
-
-    if errores:
-        raise RuntimeError(
-            f"Actualizacion parcial. Fallaron: {errores}"
-        )
