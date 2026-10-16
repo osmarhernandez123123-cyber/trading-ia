@@ -1,5 +1,6 @@
 """Pruebas del modelo causal diferido; no usan datos de mercado reales."""
 from dataclasses import replace
+import json
 
 import pandas as pd
 import pytest
@@ -7,6 +8,7 @@ import pytest
 from trading_ia.backtest import Configuracion, simular
 from trading_ia.calendario import minutos_esperados
 from trading_ia.ejecucion import preparar_diferido
+from trading_ia.investigacion import ejecutar, sha256
 from trading_ia.transformaciones import preparar
 
 
@@ -96,3 +98,19 @@ def test_modelo_invalido_y_entrada_por_gap_rechazada():
     )
     assert operaciones.empty
     assert rechazos.motivo.tolist() == ["NIVELES_INVALIDOS_TRAS_SLIPPAGE"]
+
+
+def test_pipeline_local_diferido_reproducible(tmp_path):
+    origen = tmp_path / "dataset.parquet"
+    muestra().drop(columns=["ATR_14", "SENAL"]).to_parquet(origen, index=False)
+    meta = {
+        "tipo": "sintetico", "fuente": "fixture", "licencia": "pruebas",
+        "ajuste": "sin ajuste", "dataset_id": "prueba-diferida",
+    }
+    salida = tmp_path / "diferido"
+    assert ejecutar(origen, sha256(origen), salida, meta, "diferido_1m") == 0
+    reporte = json.loads((salida / "ejecucion.json").read_text())
+    assert reporte["estado"] == "OK"
+    assert reporte["modelo_ejecucion"] == "diferido_1m"
+    assert reporte["parametros"]["LATENCIA_VELAS"] == 1
+    assert (salida / "candidatas.parquet").exists()
