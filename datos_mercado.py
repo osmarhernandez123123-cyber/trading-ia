@@ -9,6 +9,8 @@ from alpaca.data.requests import StockBarsRequest
 from alpaca.data.timeframe import TimeFrame
 from alpaca.data.enums import DataFeed
 
+from trading_ia.calidad_datos import exigir_integridad_original
+
 load_dotenv()
 
 api_key = os.getenv("ALPACA_API_KEY")
@@ -53,6 +55,8 @@ if not resultados:
     raise RuntimeError("No se descargaron datos")
 
 datos = pd.concat(resultados).sort_index()
+
+exigir_integridad_original(datos.reset_index(), "datos_mercado.py")
 
 print("\n=== RESUMEN ===")
 print(datos.groupby(level="symbol").size())

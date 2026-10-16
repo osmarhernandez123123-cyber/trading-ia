@@ -10,6 +10,8 @@ from alpaca.data.requests import StockBarsRequest
 from alpaca.data.timeframe import TimeFrame
 from alpaca.data.enums import DataFeed
 
+from trading_ia.calidad_datos import exigir_integridad_original
+
 load_dotenv()
 
 API_KEY = os.getenv("ALPACA_API_KEY")
@@ -113,6 +115,8 @@ with open(BLOQUEO, "w") as lock:
     actualizado = actualizado[
         ~actualizado.index.duplicated(keep="last")
     ].sort_index()
+
+    exigir_integridad_original(actualizado.reset_index(), "actualizar_datos.py")
 
     actualizado.to_parquet(TEMPORAL)
     TEMPORAL.replace(ARCHIVO)

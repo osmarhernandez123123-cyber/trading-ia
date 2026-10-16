@@ -7,6 +7,9 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
+from trading_ia.calendario import anotar_sesion
+from trading_ia.calidad_datos import validar_ohlcv
+
 BASE = Path(__file__).resolve().parent
 VELAS = BASE / 'datos_senales.parquet'
 CANDIDATAS = BASE / 'entradas_candidatas.parquet'
@@ -21,12 +24,16 @@ MAX_POSICIONES = 3
 SLIPPAGE_BPS = 2.0
 COMISION_ACCION = 0.0
 ZONA = 'America/New_York'
+CALENDARIO = 'XNYS'
+EXIGIR_CALIDAD_ESTRICTA = True
 TOL = 1e-6
 
 
-def ejecutar():
+def ejecutar(exigir_calidad=None):
     velas = pd.read_parquet(VELAS).reset_index(drop=True)
     candidatas = pd.read_parquet(CANDIDATAS).reset_index(drop=True)
+    if exigir_calidad is None:
+        exigir_calidad = EXIGIR_CALIDAD_ESTRICTA
     for nombre, df, requeridas in [
         ('velas', velas, {'symbol', 'timestamp', 'open', 'high', 'low', 'close'}),
         ('candidatas', candidatas, {'symbol', 'timestamp', 'entrada_timestamp', 'SENAL', 'stop_loss', 'take_profit'}),
@@ -37,15 +44,25 @@ def ejecutar():
         df['timestamp'] = pd.to_datetime(df['timestamp'], utc=True)
         if df.duplicated(['symbol', 'timestamp']).any():
             raise ValueError(f'{nombre}: timestamps duplicados')
+    if exigir_calidad:
+        reporte = validar_ohlcv(velas, CALENDARIO, comprobar_cobertura=True)
+        if not reporte.valido:
+            codigos = sorted({x.codigo for x in reporte.incidencias if x.gravedad == 'ERROR'})
+            raise ValueError(
+                'Dataset no apto para backtesting estricto: '
+                + ', '.join(codigos)
+                + '. Ejecutar validar_dataset.py para el detalle.'
+            )
     candidatas['entrada_timestamp'] = pd.to_datetime(candidatas['entrada_timestamp'], utc=True)
     velas = velas.sort_values(['timestamp', 'symbol']).copy()
-    local = velas['timestamp'].dt.tz_convert(ZONA)
-    minuto = local.dt.hour * 60 + local.dt.minute
-    velas = velas[(minuto >= 570) & (minuto < 960)].copy()
+    sesiones = anotar_sesion(velas['timestamp'], CALENDARIO)
+    velas['en_horario_regular'] = sesiones['en_horario'].to_numpy()
+    velas['cierre_anticipado'] = sesiones['cierre_anticipado'].to_numpy()
+    velas['ultima_vela_esperada'] = sesiones['ultima_vela'].to_numpy()
+    velas = velas[velas['en_horario_regular']].copy()
     if velas.empty:
         raise ValueError('No hay velas en horario regular')
     velas['fecha'] = velas['timestamp'].dt.tz_convert(ZONA).dt.date
-    velas['minuto_ny'] = velas['timestamp'].dt.tz_convert(ZONA).dt.hour * 60 + velas['timestamp'].dt.tz_convert(ZONA).dt.minute
     for col in ['open', 'high', 'low', 'close']:
         velas[col] = pd.to_numeric(velas[col], errors='coerce')
     precios = velas[['open', 'high', 'low', 'close']]
@@ -61,9 +78,9 @@ def ejecutar():
 
     # La ultima barra observada puede ser anterior a las 15:59: se informa.
     finales = velas.groupby(['symbol', 'fecha']).tail(1).copy()
-    incompletas = finales[finales.minuto_ny != 959]
+    incompletas = finales[finales.timestamp != finales.ultima_vela_esperada]
     if not incompletas.empty:
-        print(f'ADVERTENCIA: {len(incompletas)} sesiones sin vela de 15:59 NY; se cierran al ultimo dato disponible.')
+        print(f'ADVERTENCIA: {len(incompletas)} sesiones no llegan al cierre oficial; se cierran al ultimo dato disponible.')
     ultima = set(zip(finales.symbol, finales.timestamp))
 
     efectivo = CAPITAL_INICIAL
@@ -142,7 +159,7 @@ def ejecutar():
             motivo = None
             if s in activas or s in bloqueadas:
                 motivo = 'POSICION_EXISTENTE_O_SALIDA_EN_APERTURA'
-            elif (s, t) in ultima or v.minuto_ny >= 959:
+            elif (s, t) in ultima or t >= v.ultima_vela_esperada:
                 motivo = 'ULTIMA_VELA_DISPONIBLE'
             elif len(activas) >= MAX_POSICIONES:
                 motivo = 'MAX_POSICIONES'
@@ -232,7 +249,11 @@ def ejecutar():
         # 4. Cierre forzado al final de cada sesion observada.
         for v in filas:
             if (v.symbol, t) in ultima and v.symbol in activas:
-                motivo = 'FIN_SESION' if v.minuto_ny == 959 else 'FIN_SESION_DATOS_INCOMPLETOS'
+                motivo = (
+                    'FIN_SESION'
+                    if t == v.ultima_vela_esperada
+                    else 'FIN_SESION_DATOS_INCOMPLETOS'
+                )
                 cerrar(v.symbol, v.close, t, motivo)
 
         ultimo_precio.update({v.symbol: float(v.close) for v in filas})

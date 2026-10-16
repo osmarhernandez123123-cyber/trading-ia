@@ -5,6 +5,7 @@ import pandas as pd
 import pytest
 
 import backtesting_v3_1 as bt
+from trading_ia.calendario import minutos_esperados
 
 
 DAY = "2026-01-05"
@@ -22,6 +23,7 @@ def bar(symbol, hhmm, open_, high, low, close, day=DAY):
         "high": high,
         "low": low,
         "close": close,
+        "volume": 1_000,
     }
 
 
@@ -41,7 +43,7 @@ def candidate(symbol, direction, entry_hhmm="09:31", entry=100.0, distance=1.0, 
 
 @pytest.fixture
 def run_backtest(tmp_path, monkeypatch):
-    def run(velas, candidatas, **constants):
+    def run(velas, candidatas, strict=False, **constants):
         paths = {
             "VELAS": tmp_path / "velas.parquet",
             "CANDIDATAS": tmp_path / "candidatas.parquet",
@@ -55,7 +57,7 @@ def run_backtest(tmp_path, monkeypatch):
             monkeypatch.setattr(bt, name, value)
         pd.DataFrame(velas).to_parquet(paths["VELAS"], index=False)
         pd.DataFrame(candidatas).to_parquet(paths["CANDIDATAS"], index=False)
-        bt.ejecutar()
+        bt.ejecutar(exigir_calidad=strict)
         return (
             pd.read_parquet(paths["SALIDA"]),
             pd.read_parquet(paths["RECHAZOS"]),
@@ -147,6 +149,63 @@ def test_incomplete_session_closes_at_last_observation(run_backtest):
     result, _, _ = run_backtest(velas, [candidate("AAPL", "LONG")])
     assert result.loc[0, "motivo_salida"] == "FIN_SESION_DATOS_INCOMPLETOS"
     assert result.loc[0, "salida_timestamp"] == ts("09:32")
+
+
+def test_strict_mode_blocks_incomplete_data_before_backtest(run_backtest):
+    velas = [
+        bar("AAPL", "09:30", 100, 100, 100, 100),
+        bar("AAPL", "09:31", 100, 100.5, 99.8, 100.2),
+        bar("AAPL", "09:32", 100.2, 100.6, 100.0, 100.4),
+    ]
+    with pytest.raises(ValueError, match="HUECOS_DE_SESION"):
+        run_backtest(velas, [candidate("AAPL", "LONG")], strict=True)
+
+
+def test_official_early_close_is_not_marked_as_missing_data(run_backtest):
+    day = "2026-11-27"
+    velas = [{
+        "symbol": "AAPL", "timestamp": timestamp,
+        "open": 100, "high": 100.4, "low": 99.8, "close": 100.2,
+        "volume": 1_000,
+    } for timestamp in minutos_esperados(day)]
+    candidata = candidate("AAPL", "LONG", entry_hhmm="12:58", distance=1, day=day)
+    candidata["timestamp"] = ts("12:57", day)
+    result, _, _ = run_backtest(velas, [candidata], strict=True)
+    assert result.loc[0, "motivo_salida"] == "FIN_SESION"
+    assert result.loc[0, "salida_timestamp"] == ts("12:59", day)
+
+
+def test_strict_backtest_rejects_original_row_outside_regular_session(run_backtest):
+    day = "2026-11-27"
+    velas = [{
+        "symbol": "AAPL", "timestamp": timestamp,
+        "open": 100, "high": 100.4, "low": 99.8, "close": 100.2,
+        "volume": 1_000,
+    } for timestamp in minutos_esperados(day)]
+    velas.append(bar("AAPL", "08:00", 100, 101, 99, 100, day))
+    candidata = candidate("AAPL", "LONG", entry_hhmm="12:58", distance=1, day=day)
+    candidata["timestamp"] = ts("12:57", day)
+    with pytest.raises(ValueError, match="TIMESTAMP_NO_PERMITIDO"):
+        run_backtest(velas, [candidata], strict=True)
+
+
+def test_three_simultaneous_positions_and_fourth_rejected(run_backtest):
+    symbols = ["AAPL", "MSFT", "NVDA", "TSLA"]
+    velas = []
+    candidatas = []
+    for symbol in symbols:
+        velas.extend([
+            bar(symbol, "09:30", 100, 100, 100, 100),
+            bar(symbol, "09:31", 100, 100.5, 99.5, 100),
+            bar(symbol, "09:32", 100, 100.5, 99.5, 100),
+        ])
+        candidatas.append(candidate(symbol, "LONG", distance=10))
+    result, rejections, curve = run_backtest(velas, candidatas)
+    assert set(result.symbol) == {"AAPL", "MSFT", "NVDA"}
+    rechazo = rejections.loc[rejections.symbol == "TSLA"].iloc[0]
+    assert rechazo.motivo == "MAX_POSICIONES"
+    assert curve.posiciones_abiertas.max() == 3
+    assert curve.riesgo_abierto.max() <= bt.CAPITAL_INICIAL * bt.RIESGO_TOTAL + bt.TOL
 
 
 @pytest.mark.parametrize(
