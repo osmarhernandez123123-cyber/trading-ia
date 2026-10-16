@@ -81,3 +81,16 @@ solo V3.1 y el nuevo ejecutor forman el camino validado por esta fase.
 
 Publicación: consultar el estado final de la tarea. `gh auth status` informó token
 inválido; se intenta Git por separado. No se modifican credenciales para resolverlo.
+
+Estado de publicación comprobado: rama `phase3-integral-validation` publicada
+correctamente en origin. La creación del PR en borrador con `gh pr create --draft`
+falló: `Post https://api.github.com/graphql: Forbidden`. Es un bloqueo externo de
+acceso a la API; el PR no se ha creado. Título y descripción revisables en
+`docs/PR_FASE_3.md`. Para completarlo desde un entorno con acceso autorizado:
+
+```bash
+gh pr create --repo osmarhernandez123123-cyber/trading-ia \
+  --base main --head phase3-integral-validation --draft \
+  --title 'Fase 3: validación integral y pipeline reproducible offline' \
+  --body-file docs/PR_FASE_3.md
+```
