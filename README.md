@@ -56,6 +56,32 @@ Las pruebas sintéticas de V3.1 cubren LONG/SHORT, stop, objetivo, gaps,
 slippage, doble toque intrabar, datos OHLC inválidos, dimensionamiento, capital
 y cierre de sesión. Véase `AUDITORIA_FASE_1.md` para alcance y limitaciones.
 
+## Calidad y trazabilidad de datos
+
+Antes de ejecutar V3.1, validar cada artefacto histórico y conservar su reporte y
+manifiesto junto al dataset local (los Parquet siguen excluidos de Git):
+
+```bash
+python validar_dataset.py datos_acciones_30dias.parquet \
+  --reporte artefactos/calidad.json \
+  --manifiesto artefactos/manifiesto.json \
+  --dataset-id acciones-iex-1m \
+  --version 2026.10.1 \
+  --fuente "Alpaca IEX" \
+  --licencia "Describir autorización aplicable" \
+  --calendario XNYS
+```
+
+El comando termina con código 2 si encuentra errores. Registra SHA-256, versión,
+procedencia, licencia, esquema, símbolos y rango UTC, pero nunca copia el dataset.
+Los archivos JSON generados deben revisarse antes de decidir si se versionan: no
+deben contener rutas privadas ni información contractual sensible.
+
+`backtesting_v3_1.py` exige por defecto sesiones completas según el calendario
+oficial. Reconoce festivos, DST y cierres anticipados. El modo no estricto existe
+solo como argumento de Python (`ejecutar(exigir_calidad=False)`) para diagnósticos
+controlados de datos truncados; no debe usarse para publicar métricas.
+
 Varios scripts ejecutan acciones al cargarse. No importarlos como comprobación
 de instalación. Revisar cada script antes de ejecutarlo desde la raíz del proyecto:
 puede consultar servicios externos o sobrescribir datos y resultados locales.

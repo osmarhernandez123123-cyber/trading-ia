@@ -3,6 +3,7 @@
 # Instalacion propuesta: python -m pip install -r requirements.txt
 -c requirements-lock.txt
 alpaca-py==0.44.0
+exchange-calendars==4.13.2
 numpy==2.5.4
 pandas==3.0.6
 pyarrow==26.0.0
