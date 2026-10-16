@@ -42,7 +42,7 @@ def test_cuenta_de_papel_solo_lectura_y_endpoint_forzado():
     )
     assert captura["paper"] is True
     assert captura["url_override"] == PAPER_ENDPOINT
-    assert "api.alpaca.markets" not in PAPER_ENDPOINT.replace("paper-api", "paper")
+    assert PAPER_ENDPOINT == "https://paper-api.alpaca.markets"
     assert lector.resumen().patrimonio == Decimal("100000.50")
     assert lector.resumen().efectivo == Decimal("90000.10")
     assert "account_number" not in lector.resumen().__dict__
