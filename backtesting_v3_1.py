@@ -179,12 +179,31 @@ def ejecutar():
                 continue
             nocional = acciones * entrada
             riesgo_total = acciones * riesgo_unitario
+            salida_objetivo = ejec(tp, direccion, False)
+            beneficio_objetivo_unitario = (
+                signo * (salida_objetivo - entrada)
+                - 2 * COMISION_ACCION
+            )
+            r_objetivo_ejecutable = beneficio_objetivo_unitario / riesgo_unitario
+
+            # El 2R configurado en preparar_entradas.py es nominal: sus niveles
+            # se calculan sobre la apertura sin deslizamiento. Esta métrica deja
+            # visible cuánto R queda realmente alcanzable con los fills modelados.
+            entrada_nominal = float(getattr(c, 'entrada_precio', v.open))
+            riesgo_nominal = signo * (entrada_nominal - sl)
+            r_objetivo_nominal = (
+                signo * (tp - entrada_nominal) / riesgo_nominal
+                if np.isfinite(riesgo_nominal) and riesgo_nominal > 0
+                else np.nan
+            )
             efectivo -= signo * nocional + acciones * COMISION_ACCION
             activas[s] = dict(symbol=s, fecha=v.fecha, direccion=direccion,
                               senal_timestamp=c.timestamp, entrada_timestamp=t,
                               entrada=entrada, stop_loss=sl, take_profit=tp,
                               acciones=acciones, nocional=nocional,
                               riesgo_unitario=riesgo_unitario, riesgo_total=riesgo_total,
+                              R_objetivo_nominal=r_objetivo_nominal,
+                              R_objetivo_ejecutable=r_objetivo_ejecutable,
                               patrimonio_entrada=patrimonio_entrada,
                               ultimo_close=float(v.open), ultimo_timestamp=t)
             if riesgo_total > patrimonio_entrada * RIESGO_OPERACION + TOL:
@@ -258,6 +277,8 @@ def ejecutar():
     print('Rentabilidad %:', round(100 * (capital_realizado / CAPITAL_INICIAL - 1), 2))
     print('Operaciones:', len(res), 'Win rate %:', round(100 * (res.R > 0).mean(), 2))
     print('R promedio:', round(res.R.mean(), 4), 'Profit factor:', round(pf, 3))
+    print('R objetivo nominal medio:', round(res.R_objetivo_nominal.mean(), 4))
+    print('R objetivo ejecutable medio:', round(res.R_objetivo_ejecutable.mean(), 4))
     print('Max drawdown %:', round(capital_df.drawdown_pct.min(), 2))
     print('Riesgo maximo presupuestado USD:', round(res.riesgo_total.max(), 2))
     print('Operaciones con perdida mayor al riesgo presupuestado:', int((res.R < -1.000001).sum()))

@@ -45,6 +45,17 @@ cronológica entre entrenamiento y prueba, sin seleccionar parámetros con esta 
 - `backtesting*.py`: versiones históricas del backtest.
 - `dividir_datos.py`, `diagnostico*.py` y `auditar*.py`: separación y diagnósticos.
 
+## Pruebas
+
+```bash
+python -m pip install -r requirements-dev.txt
+python -m pytest -q
+```
+
+Las pruebas sintéticas de V3.1 cubren LONG/SHORT, stop, objetivo, gaps,
+slippage, doble toque intrabar, datos OHLC inválidos, dimensionamiento, capital
+y cierre de sesión. Véase `AUDITORIA_FASE_1.md` para alcance y limitaciones.
+
 Varios scripts ejecutan acciones al cargarse. No importarlos como comprobación
 de instalación. Revisar cada script antes de ejecutarlo desde la raíz del proyecto:
 puede consultar servicios externos o sobrescribir datos y resultados locales.
