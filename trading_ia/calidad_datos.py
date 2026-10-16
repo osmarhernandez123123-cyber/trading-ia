@@ -7,7 +7,7 @@ from datetime import datetime, timezone
 import hashlib
 import json
 from pathlib import Path
-from typing import Any
+from typing import Any, Iterable, Literal, Mapping
 
 import numpy as np
 import pandas as pd
@@ -15,6 +15,27 @@ import pandas as pd
 from .calendario import ZONA_NY, anotar_sesion, clasificar_cobertura
 
 COLUMNAS_REQUERIDAS = {"symbol", "timestamp", "open", "high", "low", "close", "volume"}
+
+
+@dataclass(frozen=True)
+class PoliticaHuecos:
+    """Clasificación de barras ausentes; nunca autoriza crear o rellenar velas."""
+
+    nombre: Literal["estricta", "iex_conservadora"] = "estricta"
+    minimo_simbolos_hueco_proveedor: int = 2
+    fraccion_simbolos_hueco_proveedor: float = 0.67
+
+    def __post_init__(self):
+        if self.nombre not in {"estricta", "iex_conservadora"}:
+            raise ValueError(f"Política de huecos no soportada: {self.nombre}")
+        if self.minimo_simbolos_hueco_proveedor < 1:
+            raise ValueError("minimo_simbolos_hueco_proveedor debe ser positivo")
+        if not 0 < self.fraccion_simbolos_hueco_proveedor <= 1:
+            raise ValueError("fraccion_simbolos_hueco_proveedor debe estar entre 0 y 1")
+
+
+POLITICA_ESTRICTA = PoliticaHuecos()
+POLITICA_IEX_CONSERVADORA = PoliticaHuecos(nombre="iex_conservadora")
 
 
 @dataclass(frozen=True)
@@ -34,18 +55,32 @@ class ReporteCalidad:
     fin_utc: str | None
     incidencias: list[Incidencia]
     sesiones: list[dict[str, Any]]
+    politica_huecos: str
 
     @property
     def valido(self) -> bool:
         return not any(x.gravedad == "ERROR" for x in self.incidencias)
 
+    @property
+    def apto_indicadores(self) -> bool:
+        """Exige observaciones continuas: una ausencia no se rellena ni se ignora."""
+        codigos_bloqueantes = {
+            "HUECOS_DE_SESION", "BARRA_AUSENTE_AMBIGUA",
+            "SIN_TRANSACCIONES_CONFIRMADO", "HUECO_PROVEEDOR_PROBABLE",
+        }
+        return self.valido and not any(
+            x.codigo in codigos_bloqueantes for x in self.incidencias
+        )
+
     def a_dict(self) -> dict[str, Any]:
         return {
             "valido": self.valido,
+            "apto_indicadores": self.apto_indicadores,
             "filas": self.filas,
             "simbolos": self.simbolos,
             "inicio_utc": self.inicio_utc,
             "fin_utc": self.fin_utc,
+            "politica_huecos": self.politica_huecos,
             "resumen_incidencias": {
                 gravedad: sum(x.cantidad for x in self.incidencias if x.gravedad == gravedad)
                 for gravedad in ("ERROR", "ADVERTENCIA")
@@ -63,7 +98,10 @@ def validar_ohlcv(
     datos: pd.DataFrame,
     calendario: str = "XNYS",
     comprobar_cobertura: bool = True,
+    comprobar_horario: bool = True,
     umbral_salto: float = 0.50,
+    politica_huecos: PoliticaHuecos = POLITICA_ESTRICTA,
+    minutos_sin_transacciones_confirmados: Mapping[str, Iterable[pd.Timestamp]] | None = None,
 ) -> ReporteCalidad:
     """Valida estructura, orden, OHLCV, calendario, huecos y saltos anómalos."""
     faltantes = COLUMNAS_REQUERIDAS - set(datos.columns)
@@ -115,7 +153,7 @@ def validar_ohlcv(
         incidencias.append(Incidencia("VOLUMEN_CERO", "ADVERTENCIA", volumen_cero, "Velas sin volumen; comprobar feed"))
 
     con_timestamp = df[df["timestamp"].notna()].copy()
-    if not con_timestamp.empty:
+    if comprobar_horario and not con_timestamp.empty:
         anotacion = anotar_sesion(con_timestamp["timestamp"], calendario)
         fuera = int((~anotacion["en_horario"]).sum())
         if fuera:
@@ -125,6 +163,8 @@ def validar_ohlcv(
     if comprobar_cobertura and not con_timestamp.empty:
         fechas = con_timestamp["timestamp"].dt.tz_convert(ZONA_NY).dt.date
         inicio, fin = fechas.min(), fechas.max()
+        ausencias_por_timestamp: dict[pd.Timestamp, set[str]] = {}
+        ausencias_por_simbolo: dict[str, set[pd.Timestamp]] = {}
         for simbolo, grupo in con_timestamp.groupby("symbol", sort=True):
             cobertura = clasificar_cobertura(grupo["timestamp"], inicio, fin, calendario)
             for registro in cobertura.to_dict("records"):
@@ -133,12 +173,63 @@ def validar_ohlcv(
                     registro[clave] = _iso(registro[clave])
                 registro["fecha"] = str(registro["fecha"])
                 sesiones.append(registro)
-            incompletas = cobertura[cobertura["estado"].isin(["incompleta", "sin_datos"])]
-            if not incompletas.empty:
-                incidencias.append(Incidencia(
-                    "HUECOS_DE_SESION", "ERROR", int(incompletas["minutos_faltantes"].sum()),
-                    "Minutos esperados ausentes según calendario", str(simbolo),
-                ))
+            observados = set(grupo["timestamp"])
+            esperados: set[pd.Timestamp] = set()
+            for fecha in cobertura["fecha"]:
+                esperados.update(clasificar_minutos_fecha(fecha, calendario))
+            ausentes = esperados - observados
+            ausencias_por_simbolo[str(simbolo)] = ausentes
+            for timestamp in ausentes:
+                ausencias_por_timestamp.setdefault(timestamp, set()).add(str(simbolo))
+
+        if politica_huecos.nombre == "estricta":
+            for simbolo, ausentes in ausencias_por_simbolo.items():
+                if ausentes:
+                    incidencias.append(Incidencia(
+                        "HUECOS_DE_SESION", "ERROR", len(ausentes),
+                        "Minutos esperados ausentes según calendario", simbolo,
+                    ))
+        else:
+            confirmados_por_simbolo = {}
+            for simbolo, timestamps in (minutos_sin_transacciones_confirmados or {}).items():
+                confirmados_por_simbolo[str(simbolo)] = {
+                    pd.Timestamp(x).tz_convert("UTC")
+                    if pd.Timestamp(x).tzinfo is not None
+                    else pd.Timestamp(x, tz="UTC")
+                    for x in timestamps
+                }
+            universo = max(1, len(ausencias_por_simbolo))
+            umbral = max(
+                politica_huecos.minimo_simbolos_hueco_proveedor,
+                int(np.ceil(universo * politica_huecos.fraccion_simbolos_hueco_proveedor)),
+            )
+            proveedor_probable = {
+                timestamp for timestamp, simbolos in ausencias_por_timestamp.items()
+                if len(simbolos) >= umbral
+            }
+            for simbolo, ausentes in ausencias_por_simbolo.items():
+                confirmados = confirmados_por_simbolo.get(simbolo, set())
+                sin_transacciones = ausentes & confirmados
+                proveedor = (ausentes - confirmados) & proveedor_probable
+                ambiguos = ausentes - confirmados - proveedor
+                if sin_transacciones:
+                    incidencias.append(Incidencia(
+                        "SIN_TRANSACCIONES_CONFIRMADO", "ADVERTENCIA", len(sin_transacciones),
+                        "Ausencia respaldada por evidencia externa de cero operaciones elegibles; no se crea vela",
+                        simbolo,
+                    ))
+                if proveedor:
+                    incidencias.append(Incidencia(
+                        "HUECO_PROVEEDOR_PROBABLE", "ERROR", len(proveedor),
+                        "Ausencia sincronizada en múltiples símbolos; posible pérdida del proveedor",
+                        simbolo,
+                    ))
+                if ambiguos:
+                    incidencias.append(Incidencia(
+                        "BARRA_AUSENTE_AMBIGUA", "ADVERTENCIA", len(ambiguos),
+                        "IEX no publicó barra; barras solas no distinguen cero operaciones de pérdida del feed",
+                        simbolo,
+                    ))
 
     for simbolo, grupo in con_timestamp.sort_values(["symbol", "timestamp"]).groupby("symbol"):
         continuidad = grupo["timestamp"].diff().eq(pd.Timedelta(minutes=1))
@@ -155,7 +246,35 @@ def validar_ohlcv(
         inicio_utc=_iso(con_timestamp["timestamp"].min()),
         fin_utc=_iso(con_timestamp["timestamp"].max()),
         incidencias=incidencias, sesiones=sesiones,
+        politica_huecos=politica_huecos.nombre,
     )
+
+
+def clasificar_minutos_fecha(fecha, calendario: str) -> pd.DatetimeIndex:
+    """Importación local para mantener una sola definición de minutos esperados."""
+    from .calendario import minutos_esperados
+
+    return minutos_esperados(fecha, calendario)
+
+
+def exigir_apto_para_indicadores(
+    datos: pd.DataFrame,
+    etapa: str,
+    calendario: str = "XNYS",
+    politica_huecos: PoliticaHuecos = POLITICA_IEX_CONSERVADORA,
+) -> ReporteCalidad:
+    """Puerta temprana común para indicadores, señales y candidatos."""
+    reporte = validar_ohlcv(
+        datos, calendario, comprobar_cobertura=True,
+        politica_huecos=politica_huecos,
+    )
+    if not reporte.apto_indicadores:
+        codigos = sorted({x.codigo for x in reporte.incidencias})
+        raise ValueError(
+            f"{etapa}: datos no aptos para indicadores continuos: {', '.join(codigos)}. "
+            "No se rellenaron ni fabricaron velas."
+        )
+    return reporte
 
 
 def sha256_archivo(ruta: str | Path, tamano_bloque: int = 1024 * 1024) -> str:

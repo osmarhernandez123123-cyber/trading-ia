@@ -19,6 +19,11 @@ Fecha: 2026-10-16. Rama: `codex/fase-2-infraestructura`.
 - V3.1 usa el calendario oficial y exige calidad completa por defecto antes de
   simular. Un cierre temprano legítimo genera `FIN_SESION`; un truncamiento solo
   puede examinarse en modo diagnóstico explícito.
+- Política explícita de barras ausentes para IEX: ausencia ambigua, ausencia con
+  cero operaciones confirmado y hueco sincronizado compatible con fallo probable
+  del proveedor. Ningún caso rellena precios o crea barras.
+- Puertas de calidad antes de indicadores, señales y candidatos, además de la
+  validación final de V3.1.
 - Nuevas pruebas de cuatro operaciones candidatas simultáneas, límite de tres
   posiciones, exposición, cierres tempranos y bloqueo estricto de datos parciales.
 
@@ -30,6 +35,9 @@ Fecha: 2026-10-16. Rama: `codex/fase-2-infraestructura`.
   de rendimiento ni se afirma rentabilidad.
 - El flujo anterior aceptaba sesiones incompletas y podía producir métricas tras
   cerrarlas en la última observación. V3.1 ahora las bloquea por defecto.
+- Antes de esta revisión final, indicadores, señales y candidatos podían generarse
+  sobre un Parquet defectuoso y solo ser rechazados por V3.1. Cada etapa bloquea
+  ahora la escritura de su salida si su entrada no es apta.
 
 ### Media
 
@@ -43,6 +51,9 @@ Fecha: 2026-10-16. Rama: `codex/fase-2-infraestructura`.
 - XNAS es un alias de horario de XNYS en la biblioteca instalada. Para AAPL, MSFT
   y NVDA los horarios regulares y festivos relevantes coinciden; no se modelan
   reglas específicas de subastas ni sesiones extendidas.
+- IEX cubre una parte del mercado y sus barras se basan en trades IEX. Un minuto
+  ausente aislado no identifica su causa. En modo IEX se reporta como ambiguo;
+  aun así se bloquean indicadores continuos para evitar puentear el hueco.
 
 ### Baja
 
@@ -58,6 +69,18 @@ conservadora de stop cuando una vela toca stop y objetivo permanece explícita.
 La detección de que una sesión está incompleta se usa para impedir el backtest
 estricto, no para decidir entradas rentables.
 
+## Flujo de validación
+
+1. Descarga/actualización: estructura, duplicados y coherencia OHLCV antes de
+   reemplazar el archivo local.
+2. Normalización regular: calendario XNYS y timestamps UTC/Nueva York.
+3. Indicadores: cobertura completa obligatoria antes de cualquier cálculo.
+4. Señales y candidatos: revalidación defensiva de cada artefacto intermedio.
+5. V3.1: validación estricta final antes de simular.
+
+Los controles son redundantes deliberadamente: también bloquean artefactos
+intermedios antiguos o modificados fuera del pipeline.
+
 ## Pruebas
 
 Ejecutar:
@@ -72,6 +95,9 @@ La suite utiliza únicamente datos sintéticos y no necesita Alpaca, cuentas ni
 credenciales. Cubre festivos, cierre temprano completo/truncado, DST, paridad de
 horarios XNYS/XNAS, calidad OHLCV, hashes, manifiestos, LONG/SHORT, gaps, doble
 toque, slippage, riesgo, capital, simultaneidad y cierres de sesión.
+También verifica ausencia IEX ambigua, cero trades con evidencia externa, hueco
+sincronizado de proveedor probable y que ninguna etapa temprana escriba salida
+cuando el input contiene un hueco.
 
 ## Limitaciones pendientes
 
@@ -80,6 +106,9 @@ toque, slippage, riesgo, capital, simultaneidad y cierres de sesión.
   correcciones posteriores del proveedor; deben registrarse en procedencia.
 - El calendario no sustituye controles de calidad del feed ni garantiza que una
   vela presente sea correcta.
+- Sigue pendiente decidir si una versión futura calculará indicadores por
+  segmentos con calentamiento después de ausencias legítimas. Hasta entonces se
+  bloquea la sesión, sin imputación.
 - El motor mantiene las limitaciones de spread fijo, ausencia de profundidad,
   fills parciales, latencia, borrow, margen y participación en volumen.
 - Falta separar completamente V3.1 en motor puro y adaptador Parquet; esta fase

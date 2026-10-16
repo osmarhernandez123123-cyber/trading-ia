@@ -2,6 +2,8 @@
 import pandas as pd
 from pathlib import Path
 
+from trading_ia.calidad_datos import exigir_apto_para_indicadores
+
 ARCHIVO = Path("datos_indicadores.parquet")
 
 if not ARCHIVO.exists():
@@ -9,6 +11,7 @@ if not ARCHIVO.exists():
 
 df = pd.read_parquet(ARCHIVO)
 df["timestamp"] = pd.to_datetime(df["timestamp"], utc=True)
+exigir_apto_para_indicadores(df, "motor_analisis.py")
 df = df.sort_values(["symbol", "timestamp"]).copy()
 
 def analizar(g):

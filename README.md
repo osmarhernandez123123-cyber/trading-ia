@@ -69,7 +69,8 @@ python validar_dataset.py datos_acciones_30dias.parquet \
   --version 2026.10.1 \
   --fuente "Alpaca IEX" \
   --licencia "Describir autorización aplicable" \
-  --calendario XNYS
+  --calendario XNYS \
+  --politica-huecos estricta
 ```
 
 El comando termina con código 2 si encuentra errores. Registra SHA-256, versión,
@@ -77,10 +78,21 @@ procedencia, licencia, esquema, símbolos y rango UTC, pero nunca copia el datas
 Los archivos JSON generados deben revisarse antes de decidir si se versionan: no
 deben contener rutas privadas ni información contractual sensible.
 
+Alpaca IEX no garantiza necesariamente una barra por símbolo y minuto: las barras
+se basan en trades IEX y ese feed cubre solo una parte del mercado. La política
+completa para ausencias, evidencia de cero transacciones y fallos sincronizados
+está en `POLITICA_HUECOS.md`. Ningún modo fabrica barras o rellena precios.
+
 `backtesting_v3_1.py` exige por defecto sesiones completas según el calendario
 oficial. Reconoce festivos, DST y cierres anticipados. El modo no estricto existe
 solo como argumento de Python (`ejecutar(exigir_calidad=False)`) para diagnósticos
 controlados de datos truncados; no debe usarse para publicar métricas.
+
+La validación no ocurre solo en el backtest. `datos_mercado.py` y
+`actualizar_datos.py` comprueban OHLCV antes de guardar; `indicadores.py`,
+`motor_analisis.py` y `preparar_entradas.py` vuelven a exigir continuidad antes
+de producir el siguiente artefacto. Así, un archivo defectuoso no puede generar
+indicadores, señales o candidatos y ser rechazado recién al final.
 
 Varios scripts ejecutan acciones al cargarse. No importarlos como comprobación
 de instalación. Revisar cada script antes de ejecutarlo desde la raíz del proyecto:

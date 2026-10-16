@@ -7,8 +7,10 @@ import pytest
 
 from trading_ia.calendario import minutos_esperados
 from trading_ia.calidad_datos import (
+    POLITICA_IEX_CONSERVADORA,
     crear_manifiesto,
     escribir_json,
+    exigir_apto_para_indicadores,
     sha256_archivo,
     validar_ohlcv,
 )
@@ -93,3 +95,52 @@ def test_manifiesto_exige_procedencia_y_licencia(tmp_path):
     datos.to_parquet(ruta, index=False)
     with pytest.raises(ValueError, match="obligatorios"):
         crear_manifiesto(ruta, datos, "id", "v1", "", "")
+
+
+def test_hueco_iex_aislado_es_ambiguo_y_no_se_rellena():
+    datos = dataset_sesion()
+    ausente = datos.loc[10, "timestamp"]
+    incompleto = datos.drop(index=10).reset_index(drop=True)
+    reporte = validar_ohlcv(
+        incompleto, politica_huecos=POLITICA_IEX_CONSERVADORA
+    )
+    assert reporte.valido  # no se afirma que el proveedor esté corrupto
+    assert not reporte.apto_indicadores
+    assert "BARRA_AUSENTE_AMBIGUA" in codigos(reporte)
+    assert ausente not in set(incompleto.timestamp)
+    assert len(incompleto) == len(datos) - 1
+
+
+def test_cero_transacciones_requiere_evidencia_externa_y_sigue_sin_rellenarse():
+    datos = dataset_sesion()
+    ausente = datos.loc[10, "timestamp"]
+    incompleto = datos.drop(index=10).reset_index(drop=True)
+    reporte = validar_ohlcv(
+        incompleto,
+        politica_huecos=POLITICA_IEX_CONSERVADORA,
+        minutos_sin_transacciones_confirmados={"AAPL": [ausente]},
+    )
+    assert "SIN_TRANSACCIONES_CONFIRMADO" in codigos(reporte)
+    assert "BARRA_AUSENTE_AMBIGUA" not in codigos(reporte)
+    assert not reporte.apto_indicadores
+    assert len(incompleto) == len(datos) - 1
+
+
+def test_hueco_sincronizado_sugiere_fallo_del_proveedor():
+    base = dataset_sesion()
+    datos = pd.concat([
+        base.assign(symbol=symbol) for symbol in ["AAPL", "MSFT", "NVDA"]
+    ], ignore_index=True)
+    timestamp = base.loc[10, "timestamp"]
+    incompleto = datos[datos.timestamp != timestamp].reset_index(drop=True)
+    reporte = validar_ohlcv(
+        incompleto, politica_huecos=POLITICA_IEX_CONSERVADORA
+    )
+    assert not reporte.valido
+    assert "HUECO_PROVEEDOR_PROBABLE" in codigos(reporte)
+
+
+def test_puerta_de_indicadores_bloquea_hueco_iex_ambiguo():
+    datos = dataset_sesion().drop(index=10).reset_index(drop=True)
+    with pytest.raises(ValueError, match="BARRA_AUSENTE_AMBIGUA"):
+        exigir_apto_para_indicadores(datos, "prueba")
