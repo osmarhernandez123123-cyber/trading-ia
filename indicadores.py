@@ -4,7 +4,10 @@ import numpy as np
 import pandas as pd
 
 from trading_ia.calendario import anotar_sesion
-from trading_ia.calidad_datos import exigir_apto_para_indicadores
+from trading_ia.calidad_datos import (
+    exigir_apto_para_indicadores,
+    exigir_integridad_original,
+)
 
 CARPETA = Path(__file__).resolve().parent
 
@@ -16,6 +19,7 @@ df["timestamp"] = pd.to_datetime(
     df["timestamp"], utc=True
 )
 
+exigir_integridad_original(df, "indicadores.py")
 sesiones = anotar_sesion(df["timestamp"], "XNYS")
 df = df[sesiones["en_horario"].to_numpy()].copy()
 exigir_apto_para_indicadores(df, "indicadores.py")

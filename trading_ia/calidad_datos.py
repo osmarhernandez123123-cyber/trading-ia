@@ -39,6 +39,25 @@ POLITICA_IEX_CONSERVADORA = PoliticaHuecos(nombre="iex_conservadora")
 
 
 @dataclass(frozen=True)
+class PoliticaSesion:
+    """Ventana temporal permitida en el artefacto original."""
+
+    nombre: Literal["solo_regular", "extendido_permitido"] = "solo_regular"
+    inicio_extendido_minuto_ny: int = 240  # 04:00
+    fin_extendido_minuto_ny: int = 1200  # 20:00, exclusivo
+
+    def __post_init__(self):
+        if self.nombre not in {"solo_regular", "extendido_permitido"}:
+            raise ValueError(f"Política de sesión no soportada: {self.nombre}")
+        if not 0 <= self.inicio_extendido_minuto_ny < self.fin_extendido_minuto_ny <= 1440:
+            raise ValueError("Ventana extendida inválida")
+
+
+POLITICA_SOLO_REGULAR = PoliticaSesion()
+POLITICA_EXTENDIDO_ALPACA = PoliticaSesion(nombre="extendido_permitido")
+
+
+@dataclass(frozen=True)
 class Incidencia:
     codigo: str
     gravedad: str
@@ -56,6 +75,7 @@ class ReporteCalidad:
     incidencias: list[Incidencia]
     sesiones: list[dict[str, Any]]
     politica_huecos: str
+    politica_sesion: str
 
     @property
     def valido(self) -> bool:
@@ -81,6 +101,7 @@ class ReporteCalidad:
             "inicio_utc": self.inicio_utc,
             "fin_utc": self.fin_utc,
             "politica_huecos": self.politica_huecos,
+            "politica_sesion": self.politica_sesion,
             "resumen_incidencias": {
                 gravedad: sum(x.cantidad for x in self.incidencias if x.gravedad == gravedad)
                 for gravedad in ("ERROR", "ADVERTENCIA")
@@ -101,6 +122,7 @@ def validar_ohlcv(
     comprobar_horario: bool = True,
     umbral_salto: float = 0.50,
     politica_huecos: PoliticaHuecos = POLITICA_ESTRICTA,
+    politica_sesion: PoliticaSesion = POLITICA_SOLO_REGULAR,
     minutos_sin_transacciones_confirmados: Mapping[str, Iterable[pd.Timestamp]] | None = None,
 ) -> ReporteCalidad:
     """Valida estructura, orden, OHLCV, calendario, huecos y saltos anómalos."""
@@ -155,9 +177,28 @@ def validar_ohlcv(
     con_timestamp = df[df["timestamp"].notna()].copy()
     if comprobar_horario and not con_timestamp.empty:
         anotacion = anotar_sesion(con_timestamp["timestamp"], calendario)
-        fuera = int((~anotacion["en_horario"]).sum())
+        if politica_sesion.nombre == "solo_regular":
+            permitido = anotacion["en_horario"]
+            extendido = pd.Series(False, index=anotacion.index)
+        else:
+            en_ventana_extendida = anotacion["minuto_ny"].between(
+                politica_sesion.inicio_extendido_minuto_ny,
+                politica_sesion.fin_extendido_minuto_ny - 1,
+            )
+            permitido = anotacion["es_sesion"] & en_ventana_extendida
+            extendido = permitido & ~anotacion["en_horario"]
+        cantidad_extendido = int(extendido.sum())
+        if cantidad_extendido:
+            incidencias.append(Incidencia(
+                "HORARIO_EXTENDIDO_PERMITIDO", "INFO", cantidad_extendido,
+                "Registro de sesión bursátil dentro de la ventana extendida configurada",
+            ))
+        fuera = int((~permitido).sum())
         if fuera:
-            incidencias.append(Incidencia("FUERA_DE_SESION", "ERROR", fuera, "Timestamp en festivo o fuera del horario regular"))
+            incidencias.append(Incidencia(
+                "TIMESTAMP_NO_PERMITIDO", "ERROR", fuera,
+                "Timestamp en festivo, fin de semana o fuera de la ventana configurada",
+            ))
 
     sesiones: list[dict[str, Any]] = []
     if comprobar_cobertura and not con_timestamp.empty:
@@ -247,6 +288,7 @@ def validar_ohlcv(
         fin_utc=_iso(con_timestamp["timestamp"].max()),
         incidencias=incidencias, sesiones=sesiones,
         politica_huecos=politica_huecos.nombre,
+        politica_sesion=politica_sesion.nombre,
     )
 
 
@@ -273,6 +315,26 @@ def exigir_apto_para_indicadores(
         raise ValueError(
             f"{etapa}: datos no aptos para indicadores continuos: {', '.join(codigos)}. "
             "No se rellenaron ni fabricaron velas."
+        )
+    return reporte
+
+
+def exigir_integridad_original(
+    datos: pd.DataFrame,
+    etapa: str,
+    calendario: str = "XNYS",
+    politica_sesion: PoliticaSesion = POLITICA_EXTENDIDO_ALPACA,
+) -> ReporteCalidad:
+    """Valida todas las filas antes de seleccionar la vista horaria de estrategia."""
+    reporte = validar_ohlcv(
+        datos, calendario, comprobar_cobertura=False,
+        comprobar_horario=True, politica_sesion=politica_sesion,
+    )
+    if not reporte.valido:
+        codigos = sorted({x.codigo for x in reporte.incidencias if x.gravedad == "ERROR"})
+        raise ValueError(
+            f"{etapa}: dataset original inválido: {', '.join(codigos)}. "
+            "El filtrado horario no puede ocultar estas filas."
         )
     return reporte
 

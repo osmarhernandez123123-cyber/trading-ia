@@ -9,7 +9,9 @@ import pandas as pd
 
 from trading_ia.calidad_datos import (
     POLITICA_ESTRICTA,
+    POLITICA_EXTENDIDO_ALPACA,
     POLITICA_IEX_CONSERVADORA,
+    POLITICA_SOLO_REGULAR,
     crear_manifiesto,
     escribir_json,
     validar_ohlcv,
@@ -32,6 +34,12 @@ def argumentos():
         default="estricta",
         help="Clasifica ausencias; ninguna opción crea o rellena velas",
     )
+    parser.add_argument(
+        "--politica-sesion",
+        choices=["solo-regular", "extendido-permitido"],
+        default="solo-regular",
+        help="Ventana temporal admitida en el artefacto original",
+    )
     return parser.parse_args()
 
 
@@ -45,7 +53,15 @@ def main() -> int:
         if args.politica_huecos == "estricta"
         else POLITICA_IEX_CONSERVADORA
     )
-    reporte = validar_ohlcv(datos, args.calendario, politica_huecos=politica)
+    politica_sesion = (
+        POLITICA_SOLO_REGULAR
+        if args.politica_sesion == "solo-regular"
+        else POLITICA_EXTENDIDO_ALPACA
+    )
+    reporte = validar_ohlcv(
+        datos, args.calendario, politica_huecos=politica,
+        politica_sesion=politica_sesion,
+    )
     manifiesto = crear_manifiesto(
         args.parquet, datos, args.dataset_id, args.version, args.fuente,
         args.licencia, args.calendario,

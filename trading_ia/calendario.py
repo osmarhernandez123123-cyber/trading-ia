@@ -57,12 +57,14 @@ def anotar_sesion(timestamps, nombre: str = "XNYS") -> pd.DataFrame:
     fechas = serie.dt.tz_convert(ZONA_NY).dt.date
     if serie.empty:
         return pd.DataFrame(index=serie.index, columns=[
-            "fecha", "es_sesion", "en_horario", "cierre_anticipado", "ultima_vela"
+            "fecha", "minuto_ny", "es_sesion", "en_horario",
+            "cierre_anticipado", "ultima_vela"
         ])
     horario = horario_sesiones(fechas.min(), fechas.max(), nombre)
     mapa = horario.to_dict("index")
     filas = []
-    for timestamp, fecha in zip(serie, fechas):
+    locales = serie.dt.tz_convert(ZONA_NY)
+    for timestamp, fecha, local in zip(serie, fechas, locales):
         sesion = mapa.get(fecha)
         es_sesion = sesion is not None
         en_horario = bool(
@@ -70,6 +72,7 @@ def anotar_sesion(timestamps, nombre: str = "XNYS") -> pd.DataFrame:
         )
         filas.append({
             "fecha": fecha,
+            "minuto_ny": local.hour * 60 + local.minute,
             "es_sesion": es_sesion,
             "en_horario": en_horario,
             "cierre_anticipado": bool(sesion["cierre_anticipado"]) if es_sesion else False,

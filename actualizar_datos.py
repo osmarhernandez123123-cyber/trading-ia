@@ -10,7 +10,7 @@ from alpaca.data.requests import StockBarsRequest
 from alpaca.data.timeframe import TimeFrame
 from alpaca.data.enums import DataFeed
 
-from trading_ia.calidad_datos import validar_ohlcv
+from trading_ia.calidad_datos import exigir_integridad_original
 
 load_dotenv()
 
@@ -116,17 +116,7 @@ with open(BLOQUEO, "w") as lock:
         ~actualizado.index.duplicated(keep="last")
     ].sort_index()
 
-    reporte = validar_ohlcv(
-        actualizado.reset_index(), comprobar_cobertura=False,
-        comprobar_horario=False,
-    )
-    if not reporte.valido:
-        codigos = sorted({
-            x.codigo for x in reporte.incidencias if x.gravedad == "ERROR"
-        })
-        raise ValueError(
-            f"Actualización OHLCV inválida; no se reemplaza el histórico: {codigos}"
-        )
+    exigir_integridad_original(actualizado.reset_index(), "actualizar_datos.py")
 
     actualizado.to_parquet(TEMPORAL)
     TEMPORAL.replace(ARCHIVO)

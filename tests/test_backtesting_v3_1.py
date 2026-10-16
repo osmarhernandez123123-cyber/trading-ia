@@ -175,6 +175,20 @@ def test_official_early_close_is_not_marked_as_missing_data(run_backtest):
     assert result.loc[0, "salida_timestamp"] == ts("12:59", day)
 
 
+def test_strict_backtest_rejects_original_row_outside_regular_session(run_backtest):
+    day = "2026-11-27"
+    velas = [{
+        "symbol": "AAPL", "timestamp": timestamp,
+        "open": 100, "high": 100.4, "low": 99.8, "close": 100.2,
+        "volume": 1_000,
+    } for timestamp in minutos_esperados(day)]
+    velas.append(bar("AAPL", "08:00", 100, 101, 99, 100, day))
+    candidata = candidate("AAPL", "LONG", entry_hhmm="12:58", distance=1, day=day)
+    candidata["timestamp"] = ts("12:57", day)
+    with pytest.raises(ValueError, match="TIMESTAMP_NO_PERMITIDO"):
+        run_backtest(velas, [candidata], strict=True)
+
+
 def test_three_simultaneous_positions_and_fourth_rejected(run_backtest):
     symbols = ["AAPL", "MSFT", "NVDA", "TSLA"]
     velas = []

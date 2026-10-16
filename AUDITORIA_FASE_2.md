@@ -24,6 +24,8 @@ Fecha: 2026-10-16. Rama: `codex/fase-2-infraestructura`.
   del proveedor. Ningún caso rellena precios o crea barras.
 - Puertas de calidad antes de indicadores, señales y candidatos, además de la
   validación final de V3.1.
+- Validación en dos capas para indicadores: integridad de todas las filas antes
+  del filtro y continuidad de la vista regular después del filtro.
 - Nuevas pruebas de cuatro operaciones candidatas simultáneas, límite de tres
   posiciones, exposición, cierres tempranos y bloqueo estricto de datos parciales.
 
@@ -38,6 +40,10 @@ Fecha: 2026-10-16. Rama: `codex/fase-2-infraestructura`.
 - Antes de esta revisión final, indicadores, señales y candidatos podían generarse
   sobre un Parquet defectuoso y solo ser rechazados por V3.1. Cada etapa bloquea
   ahora la escritura de su salida si su entrada no es apta.
+- El orden anterior de `indicadores.py` descartaba primero datos fuera de horario.
+  Esto podía ocultar duplicados, OHLC inválido o timestamps ilegítimos presentes
+  en el artefacto original. Ahora esas filas se validan antes de seleccionar la
+  sesión regular.
 
 ### Media
 
@@ -72,9 +78,11 @@ estricto, no para decidir entradas rentables.
 ## Flujo de validación
 
 1. Descarga/actualización: estructura, duplicados y coherencia OHLCV antes de
-   reemplazar el archivo local.
-2. Normalización regular: calendario XNYS y timestamps UTC/Nueva York.
-3. Indicadores: cobertura completa obligatoria antes de cualquier cálculo.
+   reemplazar el archivo local; horario extendido solo con política explícita.
+2. Integridad original: todas las filas se comprueban antes de filtrar. Se permite
+   04:00–20:00 NY en días bursátiles cuando la fuente declara datos extendidos.
+3. Normalización regular: se excluye el extendido legítimo y se vuelve a exigir
+   cobertura completa antes de cualquier indicador.
 4. Señales y candidatos: revalidación defensiva de cada artefacto intermedio.
 5. V3.1: validación estricta final antes de simular.
 
@@ -98,6 +106,9 @@ toque, slippage, riesgo, capital, simultaneidad y cierres de sesión.
 También verifica ausencia IEX ambigua, cero trades con evidencia externa, hueco
 sincronizado de proveedor probable y que ninguna etapa temprana escriba salida
 cuando el input contiene un hueco.
+Las regresiones finales añaden extendido legítimo, duplicado/ohlc inválido en
+premarket, fin de semana, hora no permitida y rechazo del backtest estricto antes
+de producir resultados.
 
 ## Limitaciones pendientes
 

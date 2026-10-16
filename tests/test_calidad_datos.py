@@ -7,7 +7,9 @@ import pytest
 
 from trading_ia.calendario import minutos_esperados
 from trading_ia.calidad_datos import (
+    POLITICA_EXTENDIDO_ALPACA,
     POLITICA_IEX_CONSERVADORA,
+    POLITICA_SOLO_REGULAR,
     crear_manifiesto,
     escribir_json,
     exigir_apto_para_indicadores,
@@ -62,7 +64,7 @@ def test_detecta_festivo_y_salto_anomalo():
     festivo["timestamp"] = pd.Timestamp("2026-12-25 15:00", tz="UTC")
     datos = pd.concat([datos, festivo], ignore_index=True)
     reporte = validar_ohlcv(datos, comprobar_cobertura=False)
-    assert "FUERA_DE_SESION" in codigos(reporte)
+    assert "TIMESTAMP_NO_PERMITIDO" in codigos(reporte)
     assert "SALTO_PRECIO" in codigos(reporte)
 
 
@@ -144,3 +146,59 @@ def test_puerta_de_indicadores_bloquea_hueco_iex_ambiguo():
     datos = dataset_sesion().drop(index=10).reset_index(drop=True)
     with pytest.raises(ValueError, match="BARRA_AUSENTE_AMBIGUA"):
         exigir_apto_para_indicadores(datos, "prueba")
+
+
+def fila_fuera_regular(timestamp):
+    return pd.DataFrame([{
+        "symbol": "AAPL", "timestamp": timestamp,
+        "open": 100.0, "high": 101.0, "low": 99.0, "close": 100.0,
+        "volume": 100,
+    }])
+
+
+def test_horario_extendido_legitimo_depende_de_politica_explicita():
+    premarket = pd.Timestamp("2026-11-27 08:00", tz="America/New_York").tz_convert("UTC")
+    datos = pd.concat([fila_fuera_regular(premarket), dataset_sesion()], ignore_index=True)
+    extendido = validar_ohlcv(
+        datos, comprobar_cobertura=False,
+        politica_sesion=POLITICA_EXTENDIDO_ALPACA,
+    )
+    solo_regular = validar_ohlcv(
+        datos, comprobar_cobertura=False,
+        politica_sesion=POLITICA_SOLO_REGULAR,
+    )
+    assert extendido.valido
+    assert "HORARIO_EXTENDIDO_PERMITIDO" in codigos(extendido)
+    assert extendido.politica_sesion == "extendido_permitido"
+    assert not solo_regular.valido
+    assert "TIMESTAMP_NO_PERMITIDO" in codigos(solo_regular)
+
+
+@pytest.mark.parametrize(
+    "timestamp",
+    [
+        pd.Timestamp("2026-11-27 02:00", tz="America/New_York"),
+        pd.Timestamp("2026-11-28 10:00", tz="America/New_York"),
+    ],
+)
+def test_fuera_de_ventana_o_fin_de_semana_sigue_siendo_invalido(timestamp):
+    reporte = validar_ohlcv(
+        fila_fuera_regular(timestamp.tz_convert("UTC")),
+        comprobar_cobertura=False,
+        politica_sesion=POLITICA_EXTENDIDO_ALPACA,
+    )
+    assert not reporte.valido
+    assert "TIMESTAMP_NO_PERMITIDO" in codigos(reporte)
+
+
+def test_integridad_detecta_duplicado_e_ohlc_invalido_en_extendido():
+    timestamp = pd.Timestamp("2026-11-27 08:00", tz="America/New_York").tz_convert("UTC")
+    fila = fila_fuera_regular(timestamp)
+    datos = pd.concat([fila, fila], ignore_index=True)
+    datos.loc[0, "high"] = 98
+    reporte = validar_ohlcv(
+        datos, comprobar_cobertura=False,
+        politica_sesion=POLITICA_EXTENDIDO_ALPACA,
+    )
+    assert not reporte.valido
+    assert {"DUPLICADO", "OHLC_INCONSISTENTE"} <= codigos(reporte)

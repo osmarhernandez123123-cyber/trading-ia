@@ -56,3 +56,17 @@ python validar_dataset.py datos.parquet \
 
 El comando devuelve código 2 tanto para errores como para datasets que no son
 aptos para indicadores continuos.
+
+## Horario extendido e integridad original
+
+La política de huecos no debe confundirse con la política de sesión. El dataset
+original se valida antes de eliminar filas:
+
+- `solo_regular`: solo permite minutos de la sesión oficial.
+- `extendido_permitido`: permite 04:00–20:00 Nueva York, exclusivamente en una
+  fecha de sesión reconocida por el calendario.
+
+El horario extendido válido se registra como información, no como error. Aun así,
+no participa en EMA, RSI, ATR, VWAP, volumen relativo, señales ni backtesting. Un
+registro de fin de semana/festivo, fuera de la ventana configurada, duplicado o
+con OHLCV inválido bloquea el pipeline antes de que el filtro pueda ocultarlo.

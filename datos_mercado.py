@@ -9,7 +9,7 @@ from alpaca.data.requests import StockBarsRequest
 from alpaca.data.timeframe import TimeFrame
 from alpaca.data.enums import DataFeed
 
-from trading_ia.calidad_datos import validar_ohlcv
+from trading_ia.calidad_datos import exigir_integridad_original
 
 load_dotenv()
 
@@ -56,12 +56,7 @@ if not resultados:
 
 datos = pd.concat(resultados).sort_index()
 
-reporte = validar_ohlcv(
-    datos.reset_index(), comprobar_cobertura=False, comprobar_horario=False
-)
-if not reporte.valido:
-    codigos = sorted({x.codigo for x in reporte.incidencias if x.gravedad == "ERROR"})
-    raise ValueError(f"Descarga OHLCV inválida: {', '.join(codigos)}")
+exigir_integridad_original(datos.reset_index(), "datos_mercado.py")
 
 print("\n=== RESUMEN ===")
 print(datos.groupby(level="symbol").size())
