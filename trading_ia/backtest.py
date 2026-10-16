@@ -23,6 +23,8 @@ class Configuracion:
     CALENDARIO: str = 'XNYS'
     EXIGIR_CALIDAD_ESTRICTA: bool = True
     TOL: float = 1e-6
+    # Cero mantiene V3.1; uno retrasa la entrada una vela adicional.
+    LATENCIA_VELAS: int = 0
 
 def simular(velas, candidatas, config=Configuracion(), exigir_calidad=None):
     """Motor en memoria: no lee ni escribe archivos y no consulta servicios."""
@@ -38,6 +40,8 @@ def simular(velas, candidatas, config=Configuracion(), exigir_calidad=None):
     CALENDARIO = config.CALENDARIO
     EXIGIR_CALIDAD_ESTRICTA = config.EXIGIR_CALIDAD_ESTRICTA
     TOL = config.TOL
+    if type(config.LATENCIA_VELAS) is not int or config.LATENCIA_VELAS not in (0, 1):
+        raise ValueError('LATENCIA_VELAS debe ser 0 (V3.1) o 1 (modelo diferido)')
     if exigir_calidad is None:
         exigir_calidad = EXIGIR_CALIDAD_ESTRICTA
     for nombre, df, requeridas in [
@@ -77,12 +81,18 @@ def simular(velas, candidatas, config=Configuracion(), exigir_calidad=None):
     if (velas.high < velas[['open', 'close', 'low']].max(axis=1)).any() or (velas.low > velas[['open', 'close', 'high']].min(axis=1)).any():
         raise ValueError('OHLC inconsistente')
     dif = (candidatas.entrada_timestamp - candidatas.timestamp).dt.total_seconds()
-    if not dif.eq(60).all():
-        raise ValueError('Candidata sin continuidad de un minuto')
+    minutos_entrada = 1 + config.LATENCIA_VELAS
+    if not dif.eq(60 * minutos_entrada).all():
+        raise ValueError(f'Candidata sin continuidad de {minutos_entrada} minutos')
     claves = set(zip(velas.symbol, velas.timestamp))
     if any((r.symbol, r.timestamp) not in claves or (r.symbol, r.entrada_timestamp) not in claves
            for r in candidatas.itertuples(index=False)):
         raise ValueError('Candidata sin vela de señal o entrada')
+    # Un diferimiento no puede atravesar una barra realmente ausente.
+    if config.LATENCIA_VELAS == 1:
+        if any((r.symbol, r.timestamp + pd.Timedelta(minutes=1)) not in claves
+               for r in candidatas.itertuples(index=False)):
+            raise ValueError('Candidata diferida sin vela intermedia')
     if candidatas.duplicated(['symbol', 'entrada_timestamp']).any():
         raise ValueError('Candidatas duplicadas para una misma entrada')
     indice = {(r.symbol, r.entrada_timestamp): r for r in candidatas.itertuples(index=False)}
