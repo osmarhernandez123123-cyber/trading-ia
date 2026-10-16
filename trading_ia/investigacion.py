@@ -20,13 +20,13 @@ def sha256(path):
     return h.hexdigest()
 
 
-def ejecutar(dataset, esperado, salida, procedencia):
+def ejecutar(dataset, esperado, salida, procedencia, modelo_ejecucion='v31'):
     """Exige directorio nuevo; persiste diagnóstico incluso si faltan dependencias."""
     salida = Path(salida)
     salida.mkdir(parents=True, exist_ok=False)
     reporte = {'inicio_utc': datetime.now(timezone.utc).isoformat(), 'schema_version': 1, 'estado': 'ERROR', 'python': platform.python_version(),
                'dependencias': sorted(f'{d.metadata["Name"]}=={d.version}' for d in distributions()),
-               'procedencia': procedencia, 'sha256_esperado': esperado, 'etapa': 'identidad'}
+               'procedencia': procedencia, 'sha256_esperado': esperado, 'modelo_ejecucion': modelo_ejecucion, 'etapa': 'identidad'}
     try:
         reporte['sha256_observado'] = sha256(dataset)
         if reporte['sha256_observado'] != esperado.lower():
@@ -39,10 +39,14 @@ def ejecutar(dataset, esperado, salida, procedencia):
         reporte['etapa'] = 'dependencias'
         import pandas as pd
         from .backtest import Configuracion, simular
+        from .ejecucion import preparar_diferido
         from .calendario import anotar_sesion
         from .calidad_datos import validar_ohlcv, POLITICA_EXTENDIDO_ALPACA
         from .transformaciones import calcular_indicadores, analizar, preparar
-        reporte['parametros'] = asdict(Configuracion())
+        if modelo_ejecucion not in ('v31', 'diferido_1m'):
+            raise ValueError('Modelo de ejecución desconocido')
+        configuracion = Configuracion(LATENCIA_VELAS=1 if modelo_ejecucion == 'diferido_1m' else 0)
+        reporte['parametros'] = asdict(configuracion)
         reporte['estrategia'] = {'atr_stop': 1.5, 'objetivo_nominal_r': 2, 'indicadores_entre_sesiones': True,
                                  'ajuste_splits': 'sin transformacion; requiere revision de procedencia'}
         reporte['etapa'] = 'calidad_original'
@@ -67,10 +71,10 @@ def ejecutar(dataset, esperado, salida, procedencia):
         reporte['etapa'] = 'transformaciones'
         indicadores = transformar(df, calcular_indicadores)
         senales = transformar(indicadores, analizar)
-        candidatas = transformar(senales, preparar)
+        candidatas = transformar(senales, preparar_diferido if modelo_ejecucion == 'diferido_1m' else preparar)
         reporte['etapa'] = 'backtest'
-        resultados = simular(senales, candidatas)
-        repetidos = simular(senales, candidatas)
+        resultados = simular(senales, candidatas, configuracion)
+        repetidos = simular(senales, candidatas, configuracion)
         for a, b in zip(resultados, repetidos):
             pd.testing.assert_frame_equal(a, b, check_exact=True)
         reporte['determinismo_backtest'] = 'dos ejecuciones idénticas en memoria'
@@ -100,13 +104,14 @@ def main():
     p.add_argument('--sha256', required=True)
     p.add_argument('--salida', type=Path, required=True)
     p.add_argument('--procedencia', required=True, help='JSON local con dataset_id, fuente, licencia, ajuste y tipo (real/sintetico)')
+    p.add_argument('--modelo-ejecucion', choices=['v31', 'diferido_1m'], default='v31', help='v31 es el baseline; diferido_1m fija niveles al cierre y entra una vela adicional después')
     a = p.parse_args()
     meta = json.loads(Path(a.procedencia).read_text())
     if any(not meta.get(k) for k in ['dataset_id', 'fuente', 'licencia', 'ajuste', 'tipo']):
         p.error('Procedencia incompleta')
     if meta['tipo'] not in ['real', 'sintetico']:
         p.error('tipo debe ser real o sintetico')
-    return ejecutar(a.dataset, a.sha256, a.salida, meta)
+    return ejecutar(a.dataset, a.sha256, a.salida, meta, a.modelo_ejecucion)
 
 
 if __name__ == '__main__':
