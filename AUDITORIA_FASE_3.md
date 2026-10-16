@@ -143,3 +143,40 @@ licencias y joins point-in-time. No hay señales ni decisiones basadas en notici
 - Los scripts históricos V1/V2/V3 y automatismos siguen sin refactor integral.
 - Dependencias fijadas sin hashes; el reporte captura versiones, no garantiza una
   reconstrucción binaria idéntica en otra plataforma.
+
+## Revisión adicional: ejecución de señales y latencia
+
+El modelo V3.1 se conserva como baseline (`modelo_ejecucion=v31`).
+Sus niveles se calculan usando el `open` de la vela inmediatamente
+posterior a la señal y el simulador presupone fill en dicha apertura,
+con slippage fijo. Esta convención puede ser optimista, pues no modela
+la latencia necesaria para observar el precio y enviar la orden.
+
+Como alternativa investigable se incluye
+`trading_ia.ejecucion.preparar_diferido` y la opción
+`--modelo-ejecucion diferido_1m` de la CLI. En este modelo:
+
+1. La señal se conoce al cierre de su propia vela.
+2. Los niveles SL/TP se fijan con el cierre de la vela de señal y el ATR
+   disponible en ella, sin consultar la apertura posterior.
+3. Se espera una vela completa y se intenta entrar en la siguiente
+   apertura (dos timestamps de inicio de vela después de la señal).
+4. La simulación rechaza niveles invalidados por gaps/slippage. No
+   actualiza retrospectivamente stop o take profit usando el precio futuro.
+5. Se exigen ambas barras intermedias, continuidad y misma sesión.
+
+Ejemplo local, usando una copia inmutable autorizada del dataset:
+
+```bash
+python -m trading_ia.investigacion datos.parquet \\
+  --sha256 SHA256_DE_64_CARACTERES \\
+  --procedencia procedencia.json \\
+  --modelo-ejecucion diferido_1m \\
+  --salida artefactos/diferido-001
+```
+
+Usar un directorio diferente para V3.1 y comparar los informes de
+ambas ejecuciones con **el mismo hash del dataset**. La variante no
+garantiza fills, ausencia de selección adversa, microestructura real,
+liquidez, spread variable ni rentabilidad. La CLI registra el nombre de
+modelo y la latencia configurada para evitar confundir experimentos.
