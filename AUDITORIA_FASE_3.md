@@ -168,10 +168,10 @@ Como alternativa investigable se incluye
 Ejemplo local, usando una copia inmutable autorizada del dataset:
 
 ```bash
-python -m trading_ia.investigacion datos.parquet \\
-  --sha256 SHA256_DE_64_CARACTERES \\
-  --procedencia procedencia.json \\
-  --modelo-ejecucion diferido_1m \\
+python -m trading_ia.investigacion datos.parquet \
+  --sha256 SHA256_DE_64_CARACTERES \
+  --procedencia procedencia.json \
+  --modelo-ejecucion diferido_1m \
   --salida artefactos/diferido-001
 ```
 
@@ -180,3 +180,11 @@ ambas ejecuciones con **el mismo hash del dataset**. La variante no
 garantiza fills, ausencia de selección adversa, microestructura real,
 liquidez, spread variable ni rentabilidad. La CLI registra el nombre de
 modelo y la latencia configurada para evitar confundir experimentos.
+## Revisión temporal de ejecución — 2026-10-17
+
+El uso del open siguiente para dimensionar y ejecutar en ese mismo evento es un
+supuesto idealizado potencialmente optimista; no queda validado por la ausencia
+de high/low/close futuros. V3.1 conserva su comportamiento y parámetros por defecto como referencia. La revisión
+[docs/REVISION_EJECUCION_PR3.md](docs/REVISION_EJECUCION_PR3.md) incorpora cronología,
+modelo alternativo optativo de cotizaciones con latencia, comparación sintética y
+limitaciones residuales. No hay evidencia de ejecución real ni rentabilidad.

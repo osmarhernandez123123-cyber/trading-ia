@@ -1,0 +1,232 @@
+{
+  "tipo": "EXCLUSIVAMENTE_SINTETICO",
+  "no_demuestra_rentabilidad": true,
+  "python": "3.12.14",
+  "versiones": {
+    "pandas": "3.0.6",
+    "numpy": "2.5.4",
+    "exchange-calendars": "4.13.2"
+  },
+  "configuracion_v31_sin_cambios": {
+    "CAPITAL_INICIAL": 100000.0,
+    "RIESGO_OPERACION": 0.01,
+    "RIESGO_TOTAL": 0.03,
+    "MAX_POSICIONES": 3,
+    "SLIPPAGE_BPS": 2.0,
+    "COMISION_ACCION": 0.0,
+    "ZONA": "America/New_York",
+    "CALENDARIO": "XNYS",
+    "EXIGIR_CALIDAD_ESTRICTA": true,
+    "TOL": 1e-06,
+    "LATENCIA_VELAS": 0
+  },
+  "latencia_entrada_ms": 500,
+  "demora_datos_ms": 0,
+  "escenarios": [
+    {
+      "movimiento_durante_latencia": 0.0,
+      "spread_absoluto": 0.0,
+      "hash_velas": "982c7260ab7ff833c849ff5e4677e7c183107a67ac429c0e0fe474dc7b895fd5",
+      "hash_cotizaciones": "4d6a6291440fa920cf7ce049b4aacd48d59286a303744abf872f355f43c45c3e",
+      "v31": {
+        "operaciones": 1,
+        "pnl_usd": 1402.7717000000118,
+        "capital_final": 101402.77170000001,
+        "entrada": 100.02,
+        "acciones": 961,
+        "hash_operaciones": "36cbba983131457aec6681d716042956964bd378fa53e22ba751b70d3d09073f"
+      },
+      "latencia": {
+        "operaciones": 1,
+        "pnl_usd": 1402.7717000000118,
+        "capital_final": 101402.77170000001,
+        "entrada": 100.02,
+        "acciones": 961,
+        "hash_operaciones": "913f01d1a59e0f6663e63e0e6626a5dec4c734e167be242b88a9e13c42186231",
+        "ordenes": [
+          {
+            "symbol": "TEST",
+            "timestamp": "2026-01-05T14:30:00.000Z",
+            "conocido_desde": "2026-01-05T14:31:00.000Z",
+            "SENAL": "LONG",
+            "distancia_sl": 1.0,
+            "disponible": "2026-01-05T14:31:00.000Z",
+            "fecha": "2026-01-05T00:00:00.000",
+            "estado": "EJECUTADA",
+            "motivo": "",
+            "observacion_timestamp": "2026-01-05T14:31:00.000Z",
+            "signo": 1,
+            "referencia": 100.0,
+            "stop_loss": 99.0,
+            "take_profit": 102.0,
+            "acciones": 961,
+            "corte": "2026-01-05T20:59:00.000Z",
+            "riesgo_presupuestado": 999.2478,
+            "nocional_presupuestado": 96119.22,
+            "envio_timestamp": "2026-01-05T14:31:00.000Z",
+            "llegada_timestamp": "2026-01-05T14:31:00.500Z",
+            "entrada_timestamp": "2026-01-05T14:31:01.000Z",
+            "entrada": 100.02,
+            "nocional_al_fill": 96119.22,
+            "exceso_nocional_sobre_reserva": 0.0
+          }
+        ]
+      },
+      "delta_pnl_latencia_menos_v31": 0.0
+    },
+    {
+      "movimiento_durante_latencia": 0.5,
+      "spread_absoluto": 0.0,
+      "hash_velas": "56ddfaff0d0dcb4dba2535dc3e5513e283ddede124530eb066c9066870a43b4f",
+      "hash_cotizaciones": "d1708a22d1184606d59f3d1e3b3e36f9d6d5f8d43512d971dcc708bd102bd301",
+      "v31": {
+        "operaciones": 1,
+        "pnl_usd": 1402.7717000000118,
+        "capital_final": 101402.77170000001,
+        "entrada": 100.02,
+        "acciones": 961,
+        "hash_operaciones": "36cbba983131457aec6681d716042956964bd378fa53e22ba751b70d3d09073f"
+      },
+      "latencia": {
+        "operaciones": 1,
+        "pnl_usd": 922.1756000000086,
+        "capital_final": 100922.17560000002,
+        "entrada": 100.5201,
+        "acciones": 961,
+        "hash_operaciones": "0d395bec1aad6a73117ccc6af1cdd3f05b856fef181d38bbcbd5e57c69417f0a",
+        "ordenes": [
+          {
+            "symbol": "TEST",
+            "timestamp": "2026-01-05T14:30:00.000Z",
+            "conocido_desde": "2026-01-05T14:31:00.000Z",
+            "SENAL": "LONG",
+            "distancia_sl": 1.0,
+            "disponible": "2026-01-05T14:31:00.000Z",
+            "fecha": "2026-01-05T00:00:00.000",
+            "estado": "EJECUTADA",
+            "motivo": "",
+            "observacion_timestamp": "2026-01-05T14:31:00.000Z",
+            "signo": 1,
+            "referencia": 100.0,
+            "stop_loss": 99.0,
+            "take_profit": 102.0,
+            "acciones": 961,
+            "corte": "2026-01-05T20:59:00.000Z",
+            "riesgo_presupuestado": 999.2478,
+            "nocional_presupuestado": 96119.22,
+            "envio_timestamp": "2026-01-05T14:31:00.000Z",
+            "llegada_timestamp": "2026-01-05T14:31:00.500Z",
+            "entrada_timestamp": "2026-01-05T14:31:01.000Z",
+            "entrada": 100.5201,
+            "nocional_al_fill": 96599.8161,
+            "exceso_nocional_sobre_reserva": 480.5961
+          }
+        ]
+      },
+      "delta_pnl_latencia_menos_v31": -480.5961000000033
+    },
+    {
+      "movimiento_durante_latencia": -0.5,
+      "spread_absoluto": 0.0,
+      "hash_velas": "70720eb4a21abf71936c9c2ac72e0b3be853379cf7dabdd7e94045a8fdb60823",
+      "hash_cotizaciones": "c9bd9f066def6563049dc431ca426d118273275ee16fe08024c7f30c748d074f",
+      "v31": {
+        "operaciones": 1,
+        "pnl_usd": 1402.7717000000118,
+        "capital_final": 101402.77170000001,
+        "entrada": 100.02,
+        "acciones": 961,
+        "hash_operaciones": "36cbba983131457aec6681d716042956964bd378fa53e22ba751b70d3d09073f"
+      },
+      "latencia": {
+        "operaciones": 1,
+        "pnl_usd": 1883.367800000015,
+        "capital_final": 101883.36780000002,
+        "entrada": 99.51989999999999,
+        "acciones": 961,
+        "hash_operaciones": "546a1c53b681de0104165d656cd9dd83ba45b6201cdca8c0ff9e9647f20a362e",
+        "ordenes": [
+          {
+            "symbol": "TEST",
+            "timestamp": "2026-01-05T14:30:00.000Z",
+            "conocido_desde": "2026-01-05T14:31:00.000Z",
+            "SENAL": "LONG",
+            "distancia_sl": 1.0,
+            "disponible": "2026-01-05T14:31:00.000Z",
+            "fecha": "2026-01-05T00:00:00.000",
+            "estado": "EJECUTADA",
+            "motivo": "",
+            "observacion_timestamp": "2026-01-05T14:31:00.000Z",
+            "signo": 1,
+            "referencia": 100.0,
+            "stop_loss": 99.0,
+            "take_profit": 102.0,
+            "acciones": 961,
+            "corte": "2026-01-05T20:59:00.000Z",
+            "riesgo_presupuestado": 999.2478,
+            "nocional_presupuestado": 96119.22,
+            "envio_timestamp": "2026-01-05T14:31:00.000Z",
+            "llegada_timestamp": "2026-01-05T14:31:00.500Z",
+            "entrada_timestamp": "2026-01-05T14:31:01.000Z",
+            "entrada": 99.5199,
+            "nocional_al_fill": 95638.6239,
+            "exceso_nocional_sobre_reserva": 0.0
+          }
+        ]
+      },
+      "delta_pnl_latencia_menos_v31": 480.59610000000316
+    },
+    {
+      "movimiento_durante_latencia": 0.5,
+      "spread_absoluto": 0.1,
+      "hash_velas": "56ddfaff0d0dcb4dba2535dc3e5513e283ddede124530eb066c9066870a43b4f",
+      "hash_cotizaciones": "969d556e308f396113df1d099b9b1a77a063f1c294f18d7f95caba35e467a90f",
+      "v31": {
+        "operaciones": 1,
+        "pnl_usd": 1402.7717000000118,
+        "capital_final": 101402.77170000001,
+        "entrada": 100.02,
+        "acciones": 961,
+        "hash_operaciones": "36cbba983131457aec6681d716042956964bd378fa53e22ba751b70d3d09073f"
+      },
+      "latencia": {
+        "operaciones": 1,
+        "pnl_usd": 788.2532000000003,
+        "capital_final": 100788.2532,
+        "entrada": 100.57011,
+        "acciones": 917,
+        "hash_operaciones": "4573411af7e95ec2a745e861207ff218180292cb7eefef10da0d16306f36bf4a",
+        "ordenes": [
+          {
+            "symbol": "TEST",
+            "timestamp": "2026-01-05T14:30:00.000Z",
+            "conocido_desde": "2026-01-05T14:31:00.000Z",
+            "SENAL": "LONG",
+            "distancia_sl": 1.0,
+            "disponible": "2026-01-05T14:31:00.000Z",
+            "fecha": "2026-01-05T00:00:00.000",
+            "estado": "EJECUTADA",
+            "motivo": "",
+            "observacion_timestamp": "2026-01-05T14:31:00.000Z",
+            "signo": 1,
+            "referencia": 100.0,
+            "stop_loss": 99.0,
+            "take_profit": 102.0,
+            "acciones": 917,
+            "corte": "2026-01-05T20:59:00.000Z",
+            "riesgo_presupuestado": 999.35577,
+            "nocional_presupuestado": 91764.19917,
+            "envio_timestamp": "2026-01-05T14:31:00.000Z",
+            "llegada_timestamp": "2026-01-05T14:31:00.500Z",
+            "entrada_timestamp": "2026-01-05T14:31:01.000Z",
+            "entrada": 100.57011,
+            "nocional_al_fill": 92222.79087,
+            "exceso_nocional_sobre_reserva": 458.5917
+          }
+        ]
+      },
+      "delta_pnl_latencia_menos_v31": -614.5185000000115
+    }
+  ],
+  "dos_ejecuciones_identicas": true
+}

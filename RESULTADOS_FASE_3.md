@@ -41,3 +41,17 @@ no se incluyen datasets ni Parquet en la rama.
 
 No hubo pruebas con históricos reales: no se encontraron datasets autorizados.
 No se ejecutó el workflow remoto ni se activaron operaciones o descargas.
+
+## Revisión de ejecución — 2026-10-17
+
+Suite ampliada: **91 passed, 1 warning in 25.59s**. Se conservan las 57 pruebas
+anteriores, seis pruebas remotas del modelo por velas y 28 casos nuevos
+para temporalidad y ejecución por cotizaciones.
+`pip check`, `compileall` y `git diff --check`: correctos. Resultados económicos V3.1 sin diferencias respecto a la referencia `411f842`;
+se integra el campo remoto optativo `LATENCIA_VELAS`, con cero por defecto. Comparación completa repetida dos veces con igualdad exacta.
+Advertencia transitiva `websockets.legacy` sin cambios.
+
+Informe y comandos en [docs/REVISION_EJECUCION_PR3.md](docs/REVISION_EJECUCION_PR3.md);
+resultados sintéticos detallados en
+[docs/COMPARACION_EJECUCION_SINTETICA.json](docs/COMPARACION_EJECUCION_SINTETICA.json).
+Los resultados sintéticos no demuestran rentabilidad ni realizabilidad de fills.

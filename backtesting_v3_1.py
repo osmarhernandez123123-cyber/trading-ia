@@ -24,6 +24,8 @@ ZONA = 'America/New_York'
 CALENDARIO = 'XNYS'
 EXIGIR_CALIDAD_ESTRICTA = True
 TOL = 1e-6
+# Extensión remota: el adaptador conserva V3.1 por defecto.
+LATENCIA_VELAS = 0
 
 
 from trading_ia.backtest import Configuracion, simular

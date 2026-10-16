@@ -124,3 +124,10 @@ Procedimiento, contratos para eventos, hallazgos y limitaciones en
 [AUDITORIA_FASE_3.md](AUDITORIA_FASE_3.md).
 El motor `trading_ia.backtest.simular` opera en memoria; el adaptador V3.1 conserva
 su interfaz. Un resultado sin operaciones es válido y conserva la curva de capital.
+
+La entrada V3.1 en el open que también utiliza para dimensionar supone observación
+y fill sin demora. Se conserva como benchmark idealizado. Véase la
+[revisión temporal del PR #3](docs/REVISION_EJECUCION_PR3.md) para el modelo
+alternativo explícito con latencia y sus limitaciones. La comparación reproducible
+`python -m trading_ia.comparar_ejecucion --salida work/comparacion-nueva.json` utiliza
+solo eventos sintéticos; no sustituye el pipeline por defecto ni demuestra rentabilidad.
