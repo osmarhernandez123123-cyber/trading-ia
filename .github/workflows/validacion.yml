@@ -1,16 +1,36 @@
 name: Validación sintética
+
 on:
+  push:
+    branches:
+      - main
+      - codex/fase-3-validacion
+      - 'codex/**'
+  pull_request:
+    branches:
+      - main
   workflow_dispatch:
+
 permissions:
   contents: read
+
+concurrency:
+  group: validacion-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   pruebas:
+    name: Pruebas sintéticas y estáticas (Python 3.12)
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
+          cache: pip
+          cache-dependency-path: requirements-dev.txt
       - run: python -m pip install -r requirements-dev.txt
       - run: python -m pip check
+      - run: python -m compileall -q trading_ia tests backtesting_v3_1.py
       - run: python -m pytest -q --junitxml=work/pruebas.xml
