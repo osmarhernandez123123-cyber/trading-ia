@@ -1,4 +1,8 @@
-# Preparar y habilitar Codex autónomo en GitHub
+# Codex por API — desactivado a petición del usuario
+
+**Estado actual (17 de octubre de 2026): DESACTIVADO.** No hay cron de Codex API y el job está bloqueado incluso ante ejecución manual. El usuario eligió seguir sin costes adicionales mediante la automatización existente de ChatGPT y las pruebas gratuitas disponibles de GitHub Actions. No se necesita ni se debe configurar `OPENAI_API_KEY`. Los pasos siguientes quedan solo como documentación histórica para una futura decisión expresa.
+
+## Procedimiento opcional (no activo)
 
 Esta integración utiliza **OpenAI API** con facturación independiente de la
 suscripción ChatGPT/Codex Cloud. La variante de GitHub Action ejecuta el
