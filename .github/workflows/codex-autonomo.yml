@@ -154,4 +154,9 @@ jobs:
             --base main \
             --head "$CODEX_BRANCH" \
             --title "Codex: mejora autónoma #${{ github.run_number }}" \
-            --body "Propuesta generada en un job sin permiso de escritura a GitHub. Se validó pip check, compileall y pytest antes de trasladar únicamente el parche de trading_ia/, tests/ y docs/. Requiere revisión del diff y CI antes de fusionar. No implica trading real ni rentabilidad." 
+            --body "Propuesta generada en un job sin permiso de escritura a GitHub. Se validó pip check, compileall y pytest antes de trasladar únicamente el parche de trading_ia/, tests/ y docs/. Requiere revisión del diff y CI antes de fusionar. No implica trading real ni rentabilidad."
+          # Las acciones realizadas con GITHUB_TOKEN no disparan siempre los
+          # workflows por pull_request. Cuando exista CI, lanzarla explícitamente.
+          if gh workflow view validacion.yml >/dev/null 2>&1; then
+            gh workflow run validacion.yml --ref "$CODEX_BRANCH"
+          fi
