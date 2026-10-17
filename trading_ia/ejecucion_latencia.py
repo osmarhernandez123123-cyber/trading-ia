@@ -28,15 +28,22 @@ def preparar_intenciones(senales):
     """
     g = senales[['symbol', 'timestamp', 'SENAL', 'ATR_14']].copy()
     g['timestamp'] = _tiempos(g.timestamp)
+    if g.symbol.isna().any() or g.symbol.astype(str).str.strip().eq('').any():
+        raise ValueError('Símbolo inválido en señales')
+    if g.SENAL.isna().any() or not g.SENAL.isin(['LONG', 'SHORT', 'NO TRADE']).all():
+        raise ValueError('Categoría de señal inválida')
     if g.duplicated(['symbol', 'timestamp']).any():
         raise ValueError('Señales duplicadas')
     g = g.sort_values(['symbol', 'timestamp'])
     anterior = g.groupby('symbol').SENAL.shift(1)
     nueva = g.SENAL.isin(['LONG', 'SHORT']) & g.SENAL.ne(anterior)
-    g['distancia_sl'] = g.ATR_14 * 1.5
-    g = g[nueva & g.distancia_sl.gt(0)].copy()
-    if not np.isfinite(g.distancia_sl).all():
-        raise ValueError('Distancia ATR inválida')
+    # No filtrar primero: una entrada con ATR ausente/cero se perdería en silencio.
+    distancia = pd.to_numeric(g.ATR_14, errors='coerce') * 1.5
+    validas = np.isfinite(distancia) & distancia.gt(0)
+    if not validas[nueva].all():
+        raise ValueError('Distancia ATR inválida para una nueva señal')
+    g['distancia_sl'] = distancia
+    g = g[nueva].copy()
     g['conocido_desde'] = g.timestamp + pd.Timedelta(minutes=1)
     return g[['symbol', 'timestamp', 'conocido_desde', 'SENAL', 'distancia_sl']].reset_index(drop=True)
 
@@ -84,6 +91,8 @@ def simular_latencia(cotizaciones, intenciones, *, latencia_ms, demora_datos_ms=
     i = intenciones[['symbol', 'timestamp', 'conocido_desde', 'SENAL', 'distancia_sl']].copy()
     for campo in ['timestamp', 'conocido_desde']:
         i[campo] = _tiempos(i[campo])
+    if i.symbol.isna().any() or i.symbol.astype(str).str.strip().eq('').any():
+        raise ValueError('Símbolo inválido en intenciones')
     if i.duplicated(['symbol', 'timestamp']).any() or not i.SENAL.isin(['LONG', 'SHORT']).all():
         raise ValueError('Intenciones inválidas o duplicadas')
     if not (i.conocido_desde == i.timestamp + pd.Timedelta(minutes=1)).all():
