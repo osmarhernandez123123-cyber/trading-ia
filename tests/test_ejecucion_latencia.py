@@ -251,3 +251,45 @@ def test_ninguna_cotizacion_futura_modifica_orden_ya_ejecutada():
 def test_no_mezclar_latencia_por_velas_y_por_cotizaciones():
     with pytest.raises(ValueError, match='No mezclar'):
         run(config=replace(Configuracion(), LATENCIA_VELAS=1))
+
+
+@pytest.mark.parametrize('atr', [None, float('nan'), 0, -1, float('inf'), -float('inf')])
+def test_nueva_senal_con_atr_invalido_no_desaparece_en_silencio(atr):
+    s = senales().copy()
+    s.loc[0, 'ATR_14'] = atr
+    with pytest.raises(ValueError, match='Distancia ATR inválida'):
+        preparar_intenciones(s)
+
+
+def test_no_trade_de_calentamiento_acepta_atr_ausente():
+    s = pd.concat([
+        senales().assign(timestamp=t('09:29:00'), SENAL='NO TRADE', ATR_14=float('nan')),
+        senales(),
+    ], ignore_index=True)
+    resultado = preparar_intenciones(s)
+    assert len(resultado) == 1
+    assert resultado.iloc[0]['SENAL'] == 'LONG'
+
+
+@pytest.mark.parametrize('simbolo', [None, '', '   '])
+def test_simbolos_invalidos_no_se_descartan_en_preparacion(simbolo):
+    s = senales().copy()
+    s.loc[0, 'symbol'] = simbolo
+    with pytest.raises(ValueError, match='Símbolo inválido'):
+        preparar_intenciones(s)
+
+
+@pytest.mark.parametrize('categoria', [None, '', 'BUY', 'DESCONOCIDA'])
+def test_categorias_de_senal_invalidas_se_rechazan(categoria):
+    s = senales().copy()
+    s.loc[0, 'SENAL'] = categoria
+    with pytest.raises(ValueError, match='Categoría de señal inválida'):
+        preparar_intenciones(s)
+
+
+@pytest.mark.parametrize('simbolo', [None, '', '   '])
+def test_simbolos_invalidos_no_se_admiten_en_intenciones_directas(simbolo):
+    i = preparar_intenciones(senales())
+    i.loc[0, 'symbol'] = simbolo
+    with pytest.raises(ValueError, match='Símbolo inválido'):
+        simular_latencia(quotes(), i, latencia_ms=500)
