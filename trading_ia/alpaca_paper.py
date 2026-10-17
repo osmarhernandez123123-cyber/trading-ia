@@ -68,9 +68,17 @@ class LectorAlpacaPaper:
 
     def resumen(self) -> ResumenCuentaPaper:
         cuenta = self._cliente.get_account()
+        estado = getattr(cuenta, "status", None)
+        estado = getattr(estado, "value", estado)
+        moneda = getattr(cuenta, "currency", None)
+        moneda = getattr(moneda, "value", moneda)
+        if not isinstance(estado, str) or not estado.strip():
+            raise ValueError("Estado de cuenta inválido o ausente")
+        if not isinstance(moneda, str) or len(moneda) != 3 or not moneda.isalpha() or not moneda.isupper():
+            raise ValueError("Moneda de cuenta inválida o ausente")
         return ResumenCuentaPaper(
-            estado=str(getattr(cuenta.status, "value", cuenta.status)),
-            moneda=str(getattr(cuenta, "currency", "USD")),
+            estado=estado,
+            moneda=moneda,
             patrimonio=_monto(cuenta.equity, "patrimonio"),
             efectivo=_monto(cuenta.cash, "efectivo"),
             poder_compra=_monto(cuenta.buying_power, "poder_compra"),
