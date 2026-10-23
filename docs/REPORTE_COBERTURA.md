@@ -22,9 +22,14 @@ huella conocida antes de analizarla, usar:
       --salida reportes/cobertura.json
 
 Si la huella no coincide, se rechaza el archivo y no se genera el reporte.
-También se impide que `--salida` sobrescriba el dataset de entrada. El hash
-demuestra identidad de bytes, **no** legitimidad, calidad ni procedencia
-del proveedor: debe conservarse un manifiesto de origen y licencia aparte.
+También se impide que `--salida` sobrescriba el dataset de entrada,
+incluso si el destino es un enlace duro al archivo original. Se vuelve a
+comprobar el SHA-256 y el tamaño después de leer: si el archivo cambió, se
+rechaza el reporte. Esta doble comprobación **no equivale a una lectura
+atómica**: para un dataset modificado simultáneamente por otro proceso,
+trabajar sobre una copia inmutable. El hash demuestra identidad de bytes,
+**no** legitimidad, calidad ni procedencia del proveedor: conservar un
+manifiesto de origen y licencia aparte.
 
 El archivo debe tener columnas symbol y
 timestamp; cada timestamp debe incluir zona horaria explícita, por ejemplo
