@@ -34,6 +34,12 @@ La versión debe ser identificable y no contener espacios ni rutas.
 `--zona-timestamps` es la zona **declarada** de los datos originales,
 que deben tener timestamps con offset o zona explícita; no convierte fechas.
 
+El programa comprueba fechas ISO, rango, calendario XNYS/XNAS, número de
+sesiones, minutos esperados y cierres anticipados frente al calendario bursátil.
+También verifica que cada símbolo tenga todas las fechas esperadas y que
+estados de sesión y conteos por símbolo sean coherentes. Estas comprobaciones
+no prueban que los precios ni la fuente declarada sean auténticos.
+
 El programa verifica la coherencia de los conteos entre sesiones, símbolos
 y resumen, y exige una huella SHA-256 válida en el reporte. Incluye además
 el SHA-256 de los bytes del propio reporte de cobertura para enlazar ambos
