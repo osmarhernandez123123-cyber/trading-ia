@@ -6,12 +6,15 @@ El SHA del dataset procede del reporte de cobertura previamente generado.
 from __future__ import annotations
 
 import argparse
+from datetime import date
 import hashlib
 import json
 import math
 import re
 from pathlib import Path
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
+
+from .calendario import ZONA_NY, horario_sesiones
 
 
 def _entero(obj: dict, campo: str) -> int:
@@ -32,6 +35,72 @@ def _validar_conteos(obj: dict) -> None:
             or not 0 <= fraccion <= 1
             or not math.isclose(fraccion, presentes / esperados, abs_tol=0.00000051)):
         raise ValueError("Fracción de cobertura inconsistente")
+
+
+
+def _fecha_iso(valor, nombre: str) -> date:
+    """Exige YYYY-MM-DD canónico; no interpreta fechas ambiguas."""
+    if not isinstance(valor, str) or re.fullmatch(r"\\d{4}-\\d{2}-\\d{2}", valor) is None:
+        raise ValueError(f"Fecha {nombre} inválida")
+    try:
+        fecha = date.fromisoformat(valor)
+    except ValueError as exc:
+        raise ValueError(f"Fecha {nombre} inválida") from exc
+    if fecha.isoformat() != valor:
+        raise ValueError(f"Fecha {nombre} inválida")
+    return fecha
+
+
+def _validar_calendario_y_sesiones(reporte: dict, simbolos: list, sesiones: list, resumen: dict) -> None:
+    """Contrasta calendario, fechas y cierres con sesiones bursátiles reales."""
+    calendario = reporte.get("calendario")
+    if calendario not in ("XNYS", "XNAS"):
+        raise ValueError("Calendario de cobertura inválido")
+    if reporte.get("zona_sesion") != ZONA_NY:
+        raise ValueError("Zona de sesión inconsistente")
+    inicio = _fecha_iso(reporte.get("inicio"), "inicio")
+    fin = _fecha_iso(reporte.get("fin"), "fin")
+    if inicio > fin:
+        raise ValueError("Rango de fechas invertido")
+    horario = horario_sesiones(inicio, fin, calendario)
+    if horario.empty or len(horario) != resumen["sesiones_por_simbolo"]:
+        raise ValueError("Fechas y número de sesiones no coinciden con calendario")
+
+    fechas_esperadas = set(horario.index)
+    fechas_por_simbolo = {fila["symbol"]: set() for fila in simbolos}
+    completas = {nombre: 0 for nombre in fechas_por_simbolo}
+    sin_datos = {nombre: 0 for nombre in fechas_por_simbolo}
+    for fila in sesiones:
+        fecha = _fecha_iso(fila.get("fecha"), "sesión")
+        if fecha not in fechas_esperadas:
+            raise ValueError("Fecha de sesión fuera del calendario declarado")
+        esperado = horario.loc[fecha]
+        if fila["minutos_esperados"] != int(esperado["minutos_esperados"]):
+            raise ValueError("Minutos esperados incompatibles con calendario")
+        if type(fila.get("cierre_anticipado")) is not bool or (
+            fila["cierre_anticipado"] != bool(esperado["cierre_anticipado"])
+        ):
+            raise ValueError("Cierre anticipado incompatible con calendario")
+        presentes = fila["minutos_presentes"]
+        faltantes = fila["minutos_faltantes"]
+        estado = (
+            "sin_datos" if presentes == 0 else
+            "completa_cierre_anticipado" if faltantes == 0 and esperado["cierre_anticipado"] else
+            "completa" if faltantes == 0 else "incompleta"
+        )
+        if fila.get("estado") != estado:
+            raise ValueError("Estado de sesión inconsistente")
+        nombre = fila["symbol"]
+        fechas_por_simbolo[nombre].add(fecha)
+        completas[nombre] += faltantes == 0
+        sin_datos[nombre] += presentes == 0
+    for fila in simbolos:
+        nombre = fila["symbol"]
+        if fechas_por_simbolo[nombre] != fechas_esperadas:
+            raise ValueError("Faltan sesiones de calendario por símbolo")
+        if (_entero(fila, "sesiones_completas") != completas[nombre] or
+                _entero(fila, "sesiones_sin_datos") != sin_datos[nombre]):
+            raise ValueError("Conteos de estado por símbolo inconsistentes")
 
 
 def crear_manifiesto(
@@ -116,6 +185,7 @@ def crear_manifiesto(
             fila[x] for x in ("minutos_esperados", "minutos_presentes", "minutos_faltantes")
         ]:
             raise ValueError("Sesiones no coinciden con resumen por símbolo")
+    _validar_calendario_y_sesiones(reporte, simbolos, sesiones, resumen)
 
     return {
         "schema_version": 1,
