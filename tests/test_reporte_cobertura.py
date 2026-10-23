@@ -51,6 +51,7 @@ def test_cierre_anticipado_y_fuera_de_sesion_no_cuentan_como_cobertura():
 @pytest.mark.parametrize("simbolo", [None, "", "  ", 42])
 def test_rechaza_simbolos_invalidos(simbolo):
     datos = barras("AAPL", minutos_esperados("2026-01-05")[:2])
+    datos["symbol"] = datos["symbol"].astype(object)
     datos.loc[0, "symbol"] = simbolo
     with pytest.raises(ValueError, match="Símbolo"):
         crear_reporte_cobertura(datos, fuente="IEX")
