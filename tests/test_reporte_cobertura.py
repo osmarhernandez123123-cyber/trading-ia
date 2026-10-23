@@ -133,3 +133,40 @@ def test_cli_rechaza_sha256_malformado_antes_de_abrir_datos(tmp_path):
     with pytest.raises(SystemExit) as exc:
         main([str(entrada), "--fuente", "IEX", "--sha256-esperado", "xyz"])
     assert exc.value.code == 2
+
+
+def test_cli_no_sobrescribe_dataset_si_salida_es_hardlink(tmp_path):
+    datos = barras("AAPL", minutos_esperados("2026-01-05")[:2])
+    entrada = tmp_path / "precios.csv"
+    salida = tmp_path / "alias.json"
+    datos.to_csv(entrada, index=False)
+    salida.hardlink_to(entrada)
+    contenido = entrada.read_bytes()
+    with pytest.raises(SystemExit) as exc:
+        main([str(entrada), "--fuente", "IEX", "--salida", str(salida)])
+    assert exc.value.code == 2
+    assert entrada.read_bytes() == contenido
+    assert salida.read_bytes() == contenido
+
+
+def test_cli_rechaza_dataset_mutado_durante_lectura(tmp_path, monkeypatch):
+    import trading_ia.reporte_cobertura as modulo
+
+    datos = barras("AAPL", minutos_esperados("2026-01-05")[:2])
+    entrada = tmp_path / "precios.csv"
+    salida = tmp_path / "cobertura.json"
+    datos.to_csv(entrada, index=False)
+    salida.write_text("reporte anterior", encoding="utf-8")
+
+    lector_original = modulo.pd.read_csv
+
+    def lector_con_cambio(*args, **kwargs):
+        resultado = lector_original(*args, **kwargs)
+        with entrada.open("ab") as archivo:
+            archivo.write(b"\\n")
+        return resultado
+
+    monkeypatch.setattr(modulo.pd, "read_csv", lector_con_cambio)
+    with pytest.raises(ValueError, match="cambió durante la lectura"):
+        main([str(entrada), "--fuente", "IEX", "--salida", str(salida)])
+    assert salida.read_text(encoding="utf-8") == "reporte anterior"
