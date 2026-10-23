@@ -22,7 +22,7 @@ python -m pip check
 
 El repositorio es privado y requiere acceso autorizado a GitHub.
 Las versiones de dependencias proceden del entorno local existente.
-Su instalación en un entorno limpio todavía no se ha validado;
+Su instalación en un venv limpio Linux/Python 3.12 se validó en Fase 3;
 `requirements-lock.txt` fija restricciones transitivas sin hashes.
 
 ## Configuración y datos
@@ -111,6 +111,23 @@ de instalación. Revisar cada script antes de ejecutarlo desde la raíz del proy
 puede consultar servicios externos o sobrescribir datos y resultados locales.
 `main.py` consulta la cuenta de Alpaca paper; no es un punto de entrada al backtest.
 
-La contabilidad de ejecución, slippage y cálculo de R sigue pendiente de auditoría.
+La contabilidad de ejecución, slippage y cálculo de R tienen regresiones sintéticas;
+su validación histórica real sigue pendiente.
 No activar actualizaciones automáticas ni envío de órdenes durante la preparación
 del entorno de desarrollo.
+
+## Investigación reproducible — Fase 3
+
+Usar `python -m trading_ia.investigacion --help` para ejecutar desde un Parquet
+local identificado por SHA-256, en un directorio nuevo, sin credenciales.
+Procedimiento, contratos para eventos, hallazgos y limitaciones en
+[AUDITORIA_FASE_3.md](AUDITORIA_FASE_3.md).
+El motor `trading_ia.backtest.simular` opera en memoria; el adaptador V3.1 conserva
+su interfaz. Un resultado sin operaciones es válido y conserva la curva de capital.
+
+La entrada V3.1 en el open que también utiliza para dimensionar supone observación
+y fill sin demora. Se conserva como benchmark idealizado. Véase la
+[revisión temporal del PR #3](docs/REVISION_EJECUCION_PR3.md) para el modelo
+alternativo explícito con latencia y sus limitaciones. La comparación reproducible
+`python -m trading_ia.comparar_ejecucion --salida work/comparacion-nueva.json` utiliza
+solo eventos sintéticos; no sustituye el pipeline por defecto ni demuestra rentabilidad.

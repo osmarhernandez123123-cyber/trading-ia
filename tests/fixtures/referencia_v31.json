@@ -1,0 +1,18 @@
+{
+  "commit_referencia": "411f842",
+  "codigo_sha256": {
+    "trading_ia/transformaciones.py": "f3304c0058970a7a349f99fd9838aa6c570a728e0dc872deae681fe259a77646"
+  },
+  "parametros_v31": {
+    "CAPITAL_INICIAL": 100000.0,
+    "RIESGO_OPERACION": 0.01,
+    "RIESGO_TOTAL": 0.03,
+    "MAX_POSICIONES": 3,
+    "SLIPPAGE_BPS": 2.0,
+    "COMISION_ACCION": 0.0,
+    "ZONA": "America/New_York",
+    "CALENDARIO": "XNYS",
+    "EXIGIR_CALIDAD_ESTRICTA": true,
+    "TOL": 1e-06
+  }
+}

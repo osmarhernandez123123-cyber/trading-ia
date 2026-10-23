@@ -52,3 +52,7 @@ Thumbs.db
 # Datos de mercado y resultados derivados: redistribucion no confirmada.
 # Conservar localmente; no incluir en Git hasta verificar la licencia.
 *.parquet
+
+# Ejecuciones locales: pueden contener procedencia restringida y rutas privadas.
+work/
+artefactos/
