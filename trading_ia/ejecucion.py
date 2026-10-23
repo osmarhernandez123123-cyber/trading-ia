@@ -7,6 +7,7 @@ posterior. No asume conocer el precio de ejecución al fijar niveles.
 
 Nota: el cierre de señal es una referencia, NO una ejecución garantizada.
 """
+import numpy as np
 import pandas as pd
 
 
@@ -23,12 +24,25 @@ def preparar_diferido(datos, latencia_velas=1):
     if faltantes:
         raise ValueError(f"Columnas faltantes: {sorted(faltantes)}")
 
+    # Validar antes de groupby: los símbolos nulos se omitirían en silencio.
+    if datos["symbol"].isna().any() or not datos["symbol"].map(
+        lambda s: isinstance(s, str) and bool(s.strip())
+    ).all():
+        raise ValueError("Símbolo inválido en señales")
+    if datos["SENAL"].isna().any() or not datos["SENAL"].isin(
+        ["LONG", "SHORT", "NO TRADE"]
+    ).all():
+        raise ValueError("Categoría de señal inválida")
+    if any(pd.isna(t) or pd.Timestamp(t).tzinfo is None for t in datos["timestamp"]):
+        raise ValueError("Timestamps requieren zona horaria explícita")
+    datos = datos.copy()
+    datos["timestamp"] = pd.to_datetime(datos["timestamp"], utc=True)
+    if datos.duplicated(["symbol", "timestamp"]).any():
+        raise ValueError("Timestamps duplicados")
+
     partes = []
     for _, original in datos.groupby("symbol", sort=True):
         g = original.copy().sort_values("timestamp").reset_index(drop=True)
-        g["timestamp"] = pd.to_datetime(g["timestamp"], utc=True)
-        if g["timestamp"].duplicated().any():
-            raise ValueError("Timestamps duplicados")
         proxima = g["timestamp"].shift(-1)
         dos_barras = g["timestamp"].shift(-2)
         entrada = g["timestamp"] + pd.Timedelta(minutes=2)
@@ -66,11 +80,14 @@ def preparar_diferido(datos, latencia_velas=1):
         g.loc[corto, "take_profit"] = (
             g.loc[corto, "precio_referencia_senal"] - 2 * g.loc[corto, "distancia_sl"]
         )
-        validas = (
-            nueva & contigua & misma_sesion
-            & g["distancia_sl"].gt(0)
-            & g["precio_referencia_senal"].gt(0)
-        )
+        # No permitir que un ATR/precio inválido desaparezca con el filtro.
+        if not (np.isfinite(g.loc[nueva, "distancia_sl"]) &
+                g.loc[nueva, "distancia_sl"].gt(0)).all():
+            raise ValueError("Distancia ATR inválida para nueva señal")
+        if not (np.isfinite(g.loc[nueva, "precio_referencia_senal"]) &
+                g.loc[nueva, "precio_referencia_senal"].gt(0)).all():
+            raise ValueError("Precio de señal inválido")
+        validas = nueva & contigua & misma_sesion
         partes.append(g.loc[validas].copy())
 
     if not partes:
