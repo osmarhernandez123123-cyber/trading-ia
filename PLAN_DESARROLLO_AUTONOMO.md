@@ -24,7 +24,44 @@ que un bot o modelo de IA sea rentable por estar programado.
   evita que --salida sobrescriba el dataset. Un hash no acredita procedencia,
   integridad temporal entre lecturas ni licencia de redistribución.
 - Histórico AAPL/MSFT/NVDA guardado en el Mac del usuario, no accesible desde
-  Codex Cloud por defecto. No se debe fingir su disponibilidad.
+  las herramientas de este repositorio por defecto. No se debe fingir su disponibilidad.
+- Protección adicional de lecturas y hardlinks (PR #9); manifiesto local de
+  procedencia declarada (PR #10), reforzado para fechas/calendario/cierres
+  anticipados (PR #14). Estos controles no autentican la veracidad del proveedor.
+- Laboratorio OOS descriptivo: métricas por ventana (PR #11), agregación de
+  ventanas disjuntas (PR #12), estrés de costes adicionales (PR #13) y
+  comparación contra baseline predefinido (PR #15). Todo usa fixtures sintéticos;
+  ninguna mejora de rentabilidad ha sido validada con datos reales.
+
+## Registro de integraciones verificadas (23/10/2026)
+
+| PR | Cambio incorporado | Alcance y límite |
+| --- | --- | --- |
+| #9 | Protección ante mutación de archivos y hardlinks | Integridad de lectura local; no autentica proveedor |
+| #10 | Manifiesto de procedencia declarada | Metadatos declarativos, no prueba de licencia |
+| #11 | Métricas OOS por ventana | Descriptivas, no evidencia de rentabilidad |
+| #12 | Agregación de ventanas OOS disjuntas | No suma retornos ni drawdowns |
+| #13 | Estrés de costes incrementales | Sensibilidad a supuestos, no optimización |
+| #14 | Validación de fechas y calendario en manifiesto | Reglas de coherencia, no calidad de mercado garantizada |
+| #15 | Comparación OOS contra baseline fijo | No selecciona ganadores ni calcula significancia |
+
+Los PR anteriores se integraron en `main` con CI sintética aprobada.
+Las pruebas verifican comportamiento del software, **no** una ventaja de trading.
+El modelo V3.1 de referencia no fue sustituido. Alpaca Paper sigue en modo
+solo lectura; no se autorizan órdenes, ni siquiera virtuales, sin controles
+de riesgo, idempotencia, reconciliación y apagado de emergencia.
+
+## Próximos hitos comprobables
+
+1. Ejecutar en el Mac del usuario un pipeline local reproducible con
+   datasets **autorizados**, cobertura, hashes y manifiestos; sin subir
+   datos privados al repositorio.
+2. Conectar el laboratorio OOS a estrategias congeladas antes de la prueba,
+   con universos point-in-time, costes y comparaciones fuera de muestra.
+3. Diseñar y probar aisladamente límites de riesgo, idempotencia, conciliación
+   y kill switch para Alpaca PAPER antes de habilitar cualquier orden simulada.
+4. Documentar incertidumbre, exposición, costes y resultados negativos,
+   además de posibles mejoras. No prometer rentabilidad.
 
 ## Orden de trabajo autónomo
 
@@ -46,9 +83,12 @@ que un bot o modelo de IA sea rentable por estar programado.
   históricos autorizados, diferenciar IEX disperso de fallos de proveedor
   con evidencia de fuentes y revisar límites de calidad.
 - SHA-256 local, tamaño y --sha256-esperado con protección de sobrescritura
-  integrados (PR #8). Pendiente: manifiesto de procedencia/versiones con
-  metadatos verificables, controles contra cambios del archivo entre hash
-  y lectura y política de publicación/retención de resultados.
+  integrados (PR #8); detección de mutación durante lectura y protección
+  frente a hardlinks (PR #9); manifiesto de procedencia declarada (PR #10)
+  y coherencia de fechas, calendario, cierres y conteos (PR #14).
+  Pendiente: contrastar metadatos declarados con evidencia externa autorizada,
+  definir retención/publicación y validar datasets históricos reales.
+  Hash y manifiesto no certifican origen, licencia ni completitud.
 - Identificar splits/dividendos/delistings, horario y universo histórico,
   respetando disponibilidad point-in-time.
 - Ejecutar baseline con histórico autorizado cuando se encuentre accesible.
@@ -58,8 +98,14 @@ que un bot o modelo de IA sea rentable por estar programado.
 - API común para baselines y estrategias candidatas, sin cambiar silenciosamente V3.1.
 - Comparativas de LONG/SHORT/NO TRADE, costes, regímenes de mercado,
   ablation tests y errores de ejecución.
-- Existe un generador de ventanas temporales con embargo y pruebas
-  sintéticas (PR #6). Integrarlo después con estrategias y sus etiquetas.
+- Ventanas temporales con embargo (PR #6), métricas por ventana (PR #11),
+  agregación OOS de ventanas disjuntas (PR #12), estrés incremental de
+  costes (PR #13) y comparación descriptiva de dos planes fijos (PR #15)
+  ya están integrados con pruebas sintéticas. Falta conectarlos a un
+  pipeline de estrategias y datasets reales autorizados.
+- No sumar drawdowns ni retornos de ventanas como si fueran una curva de
+  capital; no inferir superioridad de diferencias descriptivas de medias R.
+  Congelar hipótesis y parámetros antes de abrir cualquier prueba OOS.
 - Conjuntos de entrenamiento, validación y prueba final, walk-forward,
   evitando leakage y optimización sobre el bloque de prueba.
 - Informar tamaño muestral, incertidumbre, drawdown, retorno,
