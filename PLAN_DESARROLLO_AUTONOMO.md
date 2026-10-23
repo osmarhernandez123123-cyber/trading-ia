@@ -17,6 +17,12 @@ que un bot o modelo de IA sea rentable por estar programado.
 - La evidencia histórica de V3.1 sigue siendo negativa. La fuente IEX puede
   ser dispersa y está sometida a controles de cobertura. Ninguna métrica
   sintética prueba rentabilidad.
+- Reporte de cobertura local por símbolo/sesión (PR #7) integrado en main:
+  distingue minutos presentes y ausentes, sin publicar precios ni rutas.
+- Verificación de SHA-256 de archivo local (PR #8) integrada en main:
+  registra huella y tamaño, compara --sha256-esperado antes de analizar y
+  evita que --salida sobrescriba el dataset. Un hash no acredita procedencia,
+  integridad temporal entre lecturas ni licencia de redistribución.
 - Histórico AAPL/MSFT/NVDA guardado en el Mac del usuario, no accesible desde
   Codex Cloud por defecto. No se debe fingir su disponibilidad.
 
@@ -35,8 +41,14 @@ que un bot o modelo de IA sea rentable por estar programado.
 ### P1 — Datos reales y reproducibilidad
 - Diseñar una herramienta de importación local segura desde Parquet/CSV;
   nunca subir precios con redistribución no autorizada ni claves.
-- Crear un reporte de cobertura por símbolo/sesión/proveedor y diagnóstico
-  explícito de barras ausentes (IEX disperso vs fallo de proveedor).
+- Reporte de cobertura por símbolo/sesión/proveedor: implementado con
+  datos locales y pruebas sintéticas (PR #7). Falta evaluar cobertura con
+  históricos autorizados, diferenciar IEX disperso de fallos de proveedor
+  con evidencia de fuentes y revisar límites de calidad.
+- SHA-256 local, tamaño y --sha256-esperado con protección de sobrescritura
+  integrados (PR #8). Pendiente: manifiesto de procedencia/versiones con
+  metadatos verificables, controles contra cambios del archivo entre hash
+  y lectura y política de publicación/retención de resultados.
 - Identificar splits/dividendos/delistings, horario y universo histórico,
   respetando disponibilidad point-in-time.
 - Ejecutar baseline con histórico autorizado cuando se encuentre accesible.
