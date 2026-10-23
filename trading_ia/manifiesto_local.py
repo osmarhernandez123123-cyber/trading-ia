@@ -40,7 +40,7 @@ def _validar_conteos(obj: dict) -> None:
 
 def _fecha_iso(valor, nombre: str) -> date:
     """Exige YYYY-MM-DD canónico; no interpreta fechas ambiguas."""
-    if not isinstance(valor, str) or re.fullmatch(r"\\d{4}-\\d{2}-\\d{2}", valor) is None:
+    if not isinstance(valor, str) or re.fullmatch(r"[0-9]{4}-[0-9]{2}-[0-9]{2}", valor) is None:
         raise ValueError(f"Fecha {nombre} inválida")
     try:
         fecha = date.fromisoformat(valor)
