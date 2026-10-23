@@ -6,11 +6,17 @@ que un bot o modelo de IA sea rentable por estar programado.
 
 ## Estado base
 
-- Fases 1 y 2 integradas en main.
-- Fase 3: motor V3.1 separado y pipeline reproducible, PR #3. La evidencia
-  histórica de la estrategia sigue siendo negativa; las pruebas de Fase 3
-  son sintéticas. La fuente IEX puede ser dispersa y está sometida a controles
-  de cobertura. Ninguna métrica sintética prueba rentabilidad.
+- Fases 1, 2 y 3 integradas en main (PR #3 fusionado el 23/10/2026):
+  motor V3.1 separado, pipeline reproducible, modelos de ejecución diferida,
+  pruebas sintéticas y workflow CI. No se afirma rentabilidad.
+- Alpaca PAPER: solo lector seguro de cuenta integrado en main (PR #5).
+  No existe acceso remoto a credenciales paper ni envío de órdenes.
+- Laboratorio cuantitativo: generador de ventanas walk-forward con embargo
+  por horizonte de etiqueta y tests, integrado en main (PR #6). Aún no
+  entrena ni valida estrategias con datos reales.
+- La evidencia histórica de V3.1 sigue siendo negativa. La fuente IEX puede
+  ser dispersa y está sometida a controles de cobertura. Ninguna métrica
+  sintética prueba rentabilidad.
 - Histórico AAPL/MSFT/NVDA guardado en el Mac del usuario, no accesible desde
   Codex Cloud por defecto. No se debe fingir su disponibilidad.
 
@@ -22,7 +28,9 @@ que un bot o modelo de IA sea rentable por estar programado.
 - Cubrir gaps, barras ausentes, cierres anticipados, prioridad temporal,
   fills, slippage, contabilidad, datos duplicados y determinismo.
 - Mantener Python 3.12, instalación limpia y validación GitHub Actions.
-- Consolidar el PR #3 solo con pruebas correctas y revisión de cambios.
+- PR #3 integrado tras validación automatizada. Pendientes: auditorías
+  adicionales de integridad, evidencia con datasets reales autorizados y
+  confirmación de ejecución reproducible en el entorno del usuario.
 
 ### P1 — Datos reales y reproducibilidad
 - Diseñar una herramienta de importación local segura desde Parquet/CSV;
@@ -38,9 +46,10 @@ que un bot o modelo de IA sea rentable por estar programado.
 - API común para baselines y estrategias candidatas, sin cambiar silenciosamente V3.1.
 - Comparativas de LONG/SHORT/NO TRADE, costes, regímenes de mercado,
   ablation tests y errores de ejecución.
-- Conjuntos temporales de entrenamiento, validación y prueba final,
-  walk-forward con embargo cuando corresponda, evitar leakage y optimización
-  sobre test.
+- Existe un generador de ventanas temporales con embargo y pruebas
+  sintéticas (PR #6). Integrarlo después con estrategias y sus etiquetas.
+- Conjuntos de entrenamiento, validación y prueba final, walk-forward,
+  evitando leakage y optimización sobre el bloque de prueba.
 - Informar tamaño muestral, incertidumbre, drawdown, retorno,
   expectativa, exposición y fallos; no esconder resultados negativos.
 
