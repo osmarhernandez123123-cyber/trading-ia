@@ -17,8 +17,8 @@ exactos del archivo local** y registra `archivo_sha256` y `archivo_bytes` en
 el JSON, sin publicar rutas ni precios. Para comprobar una copia contra una
 huella conocida antes de analizarla, usar:
 
-    python -m trading_ia.reporte_cobertura datos/aapl_msft.csv \\
-      --fuente IEX --sha256-esperado <64_caracteres_hex> \\
+    python -m trading_ia.reporte_cobertura datos/aapl_msft.csv \
+      --fuente IEX --sha256-esperado <64_caracteres_hex> \
       --salida reportes/cobertura.json
 
 Si la huella no coincide, se rechaza el archivo y no se genera el reporte.
