@@ -114,3 +114,55 @@ def test_pipeline_local_diferido_reproducible(tmp_path):
     assert reporte["modelo_ejecucion"] == "diferido_1m"
     assert reporte["parametros"]["LATENCIA_VELAS"] == 1
     assert (salida / "candidatas.parquet").exists()
+
+
+@pytest.mark.parametrize("simbolo", [None, "", "   "])
+def test_diferido_no_descarta_simbolos_invalidos(simbolo):
+    datos = muestra()
+    datos.loc[20, "symbol"] = simbolo
+    with pytest.raises(ValueError, match="Símbolo inválido"):
+        preparar_diferido(datos)
+
+
+@pytest.mark.parametrize("senal", [None, "", "BUY", "DESCONOCIDA"])
+def test_diferido_rechaza_categorias_desconocidas(senal):
+    datos = muestra()
+    datos.loc[20, "SENAL"] = senal
+    with pytest.raises(ValueError, match="Categoría de señal inválida"):
+        preparar_diferido(datos)
+
+
+@pytest.mark.parametrize("atr", [None, float("nan"), 0.0, -1.0, float("inf")])
+def test_diferido_rechaza_atr_invalido_en_nueva_senal(atr):
+    datos = muestra()
+    datos.loc[20, "ATR_14"] = atr
+    with pytest.raises(ValueError, match="Distancia ATR inválida"):
+        preparar_diferido(datos)
+
+
+@pytest.mark.parametrize("cierre", [None, float("nan"), 0.0, -5.0, float("inf")])
+def test_diferido_rechaza_precio_invalido_en_nueva_senal(cierre):
+    datos = muestra()
+    datos.loc[20, "close"] = cierre
+    with pytest.raises(ValueError, match="Precio de señal inválido"):
+        preparar_diferido(datos)
+
+
+def test_diferido_acepta_calentamiento_sin_atr():
+    datos = muestra()
+    datos.loc[0, "ATR_14"] = float("nan")
+    assert len(preparar_diferido(datos)) == 1
+
+
+def test_diferido_rechaza_timestamp_sin_zona_horaria():
+    datos = muestra()
+    datos["timestamp"] = datos["timestamp"].dt.tz_localize(None)
+    with pytest.raises(ValueError, match="zona horaria"):
+        preparar_diferido(datos)
+
+
+def test_diferido_rechaza_timestamps_duplicados():
+    datos = muestra()
+    datos = pd.concat([datos, datos.iloc[[20]]], ignore_index=True)
+    with pytest.raises(ValueError, match="Timestamps duplicados"):
+        preparar_diferido(datos)
