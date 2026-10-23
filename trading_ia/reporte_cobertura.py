@@ -182,7 +182,12 @@ def main(argv: list[str] | None = None) -> int:
         help="SHA-256 esperado (64 caracteres hexadecimales) para verificar el archivo",
     )
     args = parser.parse_args(argv)
-    if args.salida is not None and args.salida.resolve() == args.archivo.resolve():
+    if args.salida is not None and (
+        args.salida.resolve() == args.archivo.resolve()
+        or (args.salida.exists() and args.archivo.exists()
+            and args.salida.samefile(args.archivo))
+    ):
+        # samefile detecta también enlaces duros, no solo rutas/symlinks.
         parser.error("--salida no puede sobrescribir el dataset de entrada")
     if args.archivo.suffix.lower() not in (".csv", ".parquet"):
         parser.error("Solo se admiten archivos CSV o Parquet")
@@ -192,6 +197,7 @@ def main(argv: list[str] | None = None) -> int:
     ):
         parser.error("--sha256-esperado debe tener 64 caracteres hexadecimales")
     huella = _sha256_archivo(args.archivo)
+    tamano_inicial = args.archivo.stat().st_size
     if args.sha256_esperado is not None and huella != args.sha256_esperado.lower():
         raise ValueError("SHA-256 del dataset no coincide con el esperado")
     if args.archivo.suffix.lower() == ".parquet":
@@ -200,13 +206,18 @@ def main(argv: list[str] | None = None) -> int:
         datos = pd.read_csv(args.archivo, usecols=["symbol", "timestamp"])
     else:
         parser.error("Solo se admiten archivos CSV o Parquet")
+    # Revalidar después de leer: no asociar un reporte a una huella previa
+    # si el archivo cambió durante el análisis (detección, no snapshot atómico).
+    if (_sha256_archivo(args.archivo) != huella
+            or args.archivo.stat().st_size != tamano_inicial):
+        raise ValueError("El dataset cambió durante la lectura; no se emite reporte")
     reporte = crear_reporte_cobertura(
         datos, fuente=args.fuente, calendario=args.calendario,
         inicio=args.inicio, fin=args.fin,
     )
     # Solo la huella criptográfica, nunca la ruta local ni datos del archivo.
     reporte["archivo_sha256"] = huella
-    reporte["archivo_bytes"] = args.archivo.stat().st_size
+    reporte["archivo_bytes"] = tamano_inicial
     salida = json.dumps(reporte, ensure_ascii=False, indent=2) + "\n"
     if args.salida is None:
         print(salida, end="")
