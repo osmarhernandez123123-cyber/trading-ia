@@ -1,5 +1,6 @@
 """Pruebas sintéticas sin acceso a red ni precios reales."""
 
+import hashlib
 import json
 
 import pandas as pd
@@ -80,3 +81,55 @@ def test_cli_csv_local_sin_credenciales(tmp_path):
     assert reporte["resumen"]["minutos_faltantes"] == 388
     assert reporte["fuente"] == "IEX"
     assert "ALPACA" not in salida.read_text(encoding="utf-8")
+
+
+def test_cli_registra_hash_bytes_y_valida_integridad(tmp_path):
+    datos = barras("AAPL", minutos_esperados("2026-01-05")[:3])
+    entrada = tmp_path / "precios.csv"
+    salida = tmp_path / "cobertura.json"
+    datos.to_csv(entrada, index=False)
+    contenido = entrada.read_bytes()
+    huella = hashlib.sha256(contenido).hexdigest()
+
+    assert main([
+        str(entrada), "--fuente", "IEX",
+        "--sha256-esperado", huella.upper(), "--salida", str(salida),
+    ]) == 0
+    reporte = json.loads(salida.read_text(encoding="utf-8"))
+    assert reporte["archivo_sha256"] == huella
+    assert reporte["archivo_bytes"] == len(contenido)
+    assert entrada.read_bytes() == contenido
+
+
+def test_cli_no_escribe_reporte_si_sha256_no_coincide(tmp_path):
+    datos = barras("AAPL", minutos_esperados("2026-01-05")[:2])
+    entrada = tmp_path / "precios.csv"
+    salida = tmp_path / "cobertura.json"
+    datos.to_csv(entrada, index=False)
+    salida.write_text("inmutable", encoding="utf-8")
+    contenido = entrada.read_bytes()
+    with pytest.raises(ValueError, match="SHA-256"):
+        main([
+            str(entrada), "--fuente", "IEX",
+            "--sha256-esperado", "0" * 64, "--salida", str(salida),
+        ])
+    assert salida.read_text(encoding="utf-8") == "inmutable"
+    assert entrada.read_bytes() == contenido
+
+
+def test_cli_no_sobrescribe_dataset_si_salida_equivale_a_entrada(tmp_path):
+    datos = barras("AAPL", minutos_esperados("2026-01-05")[:2])
+    entrada = tmp_path / "precios.csv"
+    datos.to_csv(entrada, index=False)
+    contenido = entrada.read_bytes()
+    with pytest.raises(SystemExit) as exc:
+        main([str(entrada), "--fuente", "IEX", "--salida", str(entrada)])
+    assert exc.value.code == 2
+    assert entrada.read_bytes() == contenido
+
+
+def test_cli_rechaza_sha256_malformado_antes_de_abrir_datos(tmp_path):
+    entrada = tmp_path / "no_existe.csv"
+    with pytest.raises(SystemExit) as exc:
+        main([str(entrada), "--fuente", "IEX", "--sha256-esperado", "xyz"])
+    assert exc.value.code == 2

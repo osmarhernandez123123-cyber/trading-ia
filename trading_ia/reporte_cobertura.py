@@ -9,8 +9,10 @@ from __future__ import annotations
 
 import argparse
 from datetime import date
+import hashlib
 import json
 from pathlib import Path
+import string
 
 import pandas as pd
 
@@ -158,6 +160,15 @@ def crear_reporte_cobertura(
     }
 
 
+def _sha256_archivo(ruta: Path) -> str:
+    """Huella de los bytes exactos del archivo, sin cargarlo en memoria."""
+    digest = hashlib.sha256()
+    with ruta.open("rb") as archivo:
+        for bloque in iter(lambda: archivo.read(1024 * 1024), b""):
+            digest.update(bloque)
+    return digest.hexdigest()
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("archivo", type=Path, help="CSV o Parquet local con symbol y timestamp")
@@ -166,7 +177,23 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--inicio", help="Primera fecha de sesión YYYY-MM-DD")
     parser.add_argument("--fin", help="Última fecha de sesión YYYY-MM-DD")
     parser.add_argument("--salida", type=Path, help="Ruta local de reporte JSON; por defecto stdout")
+    parser.add_argument(
+        "--sha256-esperado",
+        help="SHA-256 esperado (64 caracteres hexadecimales) para verificar el archivo",
+    )
     args = parser.parse_args(argv)
+    if args.salida is not None and args.salida.resolve() == args.archivo.resolve():
+        parser.error("--salida no puede sobrescribir el dataset de entrada")
+    if args.archivo.suffix.lower() not in (".csv", ".parquet"):
+        parser.error("Solo se admiten archivos CSV o Parquet")
+    if args.sha256_esperado is not None and (
+        len(args.sha256_esperado) != 64
+        or any(c not in string.hexdigits for c in args.sha256_esperado)
+    ):
+        parser.error("--sha256-esperado debe tener 64 caracteres hexadecimales")
+    huella = _sha256_archivo(args.archivo)
+    if args.sha256_esperado is not None and huella != args.sha256_esperado.lower():
+        raise ValueError("SHA-256 del dataset no coincide con el esperado")
     if args.archivo.suffix.lower() == ".parquet":
         datos = pd.read_parquet(args.archivo, columns=["symbol", "timestamp"])
     elif args.archivo.suffix.lower() == ".csv":
@@ -177,6 +204,9 @@ def main(argv: list[str] | None = None) -> int:
         datos, fuente=args.fuente, calendario=args.calendario,
         inicio=args.inicio, fin=args.fin,
     )
+    # Solo la huella criptográfica, nunca la ruta local ni datos del archivo.
+    reporte["archivo_sha256"] = huella
+    reporte["archivo_bytes"] = args.archivo.stat().st_size
     salida = json.dumps(reporte, ensure_ascii=False, indent=2) + "\n"
     if args.salida is None:
         print(salida, end="")

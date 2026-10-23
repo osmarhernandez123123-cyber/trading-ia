@@ -12,7 +12,21 @@ Ejemplo con CSV:
       --inicio 2026-01-05 --fin 2026-01-09 \
       --salida reportes/cobertura.json
 
-También admite archivos .parquet. El archivo debe tener columnas symbol y
+También admite archivos .parquet. La CLI calcula el SHA-256 de los **bytes
+exactos del archivo local** y registra `archivo_sha256` y `archivo_bytes` en
+el JSON, sin publicar rutas ni precios. Para comprobar una copia contra una
+huella conocida antes de analizarla, usar:
+
+    python -m trading_ia.reporte_cobertura datos/aapl_msft.csv \
+      --fuente IEX --sha256-esperado <64_caracteres_hex> \
+      --salida reportes/cobertura.json
+
+Si la huella no coincide, se rechaza el archivo y no se genera el reporte.
+También se impide que `--salida` sobrescriba el dataset de entrada. El hash
+demuestra identidad de bytes, **no** legitimidad, calidad ni procedencia
+del proveedor: debe conservarse un manifiesto de origen y licencia aparte.
+
+El archivo debe tener columnas symbol y
 timestamp; cada timestamp debe incluir zona horaria explícita, por ejemplo
 2026-01-05T14:30:00Z. Los valores sin zona horaria se rechazan en lugar de
 asumir UTC. Las fechas de inicio y fin son fechas de sesión en Nueva York.
