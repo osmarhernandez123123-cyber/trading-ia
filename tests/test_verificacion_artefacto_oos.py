@@ -295,3 +295,10 @@ def test_rechaza_delta_no_finito_derivado_de_medias_finitas():
         reporte["comparacion"]["por_ventana"][0][f"expectativa_r_{nombre}"] = valor
     with pytest.raises(ValueError, match="Diferencia media R no finita"):
         _verificar_con_nueva_huella(reporte, hashes)
+
+
+def test_rechaza_entero_json_enorme_en_media_sin_desbordar_excepcion():
+    reporte, hashes = _con_medias_sinteticas()
+    reporte["comparacion"]["baseline"]["por_ventana"][0]["expectativa_r"] = 10 ** 400
+    with pytest.raises(ValueError, match="Expectativa R baseline"):
+        _verificar_con_nueva_huella(reporte, hashes)
