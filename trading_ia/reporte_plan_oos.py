@@ -10,6 +10,7 @@ import re
 from collections.abc import Mapping, Sequence
 from datetime import date
 
+import exchange_calendars as xcals
 import pandas as pd
 
 from .comparacion_baseline_oos import comparar_baseline_oos
@@ -21,8 +22,8 @@ ADVERTENCIA_REPORTE = (
     "La huella del plan debe haberse comprometido externamente ANTES de "
     "observar OOS. Comprobarla aquí no acredita fecha de registro, "
     "autenticidad del dataset ni de los parámetros declarados. "
-    "Las fechas suministradas deben proceder de sesiones bursátiles "
-    "verificadas; no se valida el calendario de mercado en este módulo. "
+    "Las fechas se contrastan con sesiones XNYS completas; "
+    "esto no verifica la calidad, origen ni cobertura intradía del dataset. "
     "Las métricas son descriptivas, no demuestran rentabilidad."
 )
 
@@ -52,7 +53,19 @@ def comparar_plan_registrado_oos(
         raise ValueError("La huella del plan no coincide con el compromiso")
 
     normalizado = registro["plan"]
-    ventanas = crear_ventanas(sesiones, **normalizado["ventanas"])
+    fechas = tuple(sesiones)
+    ventanas = crear_ventanas(fechas, **normalizado["ventanas"])
+    # No aceptar fines de semana, festivos ni sesiones omitidas. El embargo
+    # y las ventanas deben contarse en sesiones bursátiles, no días naturales.
+    try:
+        mercado = xcals.get_calendar("XNYS")
+        sesiones_mercado = tuple(
+            ts.date() for ts in mercado.sessions_in_range(fechas[0], fechas[-1])
+        )
+    except (ValueError, TypeError, OverflowError) as exc:
+        raise ValueError("Rango de sesiones fuera del calendario XNYS") from exc
+    if fechas != sesiones_mercado:
+        raise ValueError("Sesiones incompletas o inválidas para calendario XNYS")
     if (ventanas[0].inicio_prueba.isoformat() != normalizado["inicio_prueba"]
             or ventanas[-1].fin_prueba.isoformat() != normalizado["fin_prueba"]):
         raise ValueError("Los límites OOS no coinciden con el plan registrado")
