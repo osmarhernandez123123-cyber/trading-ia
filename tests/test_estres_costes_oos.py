@@ -80,6 +80,33 @@ def test_rechaza_nocional_invalido(nocional):
         evaluar_estres_costes(df, ventana(), coste_extra_bps_lado=10)
 
 
+
+@pytest.mark.parametrize("nocional", ["1000.0", True, False])
+def test_rechaza_nocional_convertible_pero_no_numerico(nocional):
+    df = operaciones()
+    df["nocional"] = pd.Series(
+        [nocional, 2000.0, 3000.0], dtype="object"
+    )
+    with pytest.raises(ValueError, match="valores numéricos"):
+        evaluar_estres_costes(df, ventana(), coste_extra_bps_lado=10)
+
+
+def test_nocional_grande_no_desborda_en_multiplicacion_intermedia():
+    df = operaciones().iloc[:1].copy()
+    df["nocional"] = 1e308
+    resultado = evaluar_estres_costes(df, ventana(), coste_extra_bps_lado=1)
+    assert resultado["coste_extra_total_usd"] == pytest.approx(2e304)
+    assert resultado["estresado"]["operaciones"] == 1
+
+
+def test_rechaza_desbordamiento_de_coste_agregado():
+    df = operaciones()
+    df["nocional"] = 1e308
+    # Cada coste individual es finito (8e307), pero la suma no.
+    with pytest.raises(ValueError, match="agregado no finito"):
+        evaluar_estres_costes(df, ventana(), coste_extra_bps_lado=4000)
+
+
 def test_rechaza_falta_nocional():
     with pytest.raises(ValueError, match="nocional"):
         evaluar_estres_costes(
