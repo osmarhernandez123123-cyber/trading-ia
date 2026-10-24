@@ -5,6 +5,7 @@ ni calcula significancia estadística. Las operaciones pueden ser sintéticas.
 """
 from __future__ import annotations
 
+from math import isfinite
 from typing import Sequence
 
 import pandas as pd
@@ -59,6 +60,10 @@ def comparar_baseline_oos(
             c["expectativa_r"] - b["expectativa_r"]
             if b["operaciones"] and c["operaciones"] else None
         )
+        # Las medias individuales pueden ser finitas y su resta desbordar.
+        # No emitir inf como si fuese una diferencia descriptiva válida.
+        if delta is not None and not isfinite(delta):
+            raise ValueError("Diferencia media R descriptiva no finita")
         comparacion.append({
             "inicio_prueba": b["inicio_prueba"],
             "fin_prueba": b["fin_prueba"],
