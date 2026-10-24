@@ -1,7 +1,8 @@
 """Pruebas sintéticas del vínculo plan -> reporte; sin red ni broker."""
 import copy
-from datetime import date, timedelta
+from datetime import date
 
+import exchange_calendars as xcals
 import pandas as pd
 import pytest
 
@@ -10,8 +11,9 @@ from trading_ia.reporte_plan_oos import comparar_plan_registrado_oos
 
 
 def sesiones_ejemplo():
-    # Días artificiales para probar índices; NO calendario bursátil real.
-    return [date(2026, 1, 1) + timedelta(days=i) for i in range(15)]
+    # Fechas reales XNYS, operaciones completamente sintéticas.
+    mercado = xcals.get_calendar("XNYS")
+    return [ts.date() for ts in mercado.sessions_in_range("2026-01-02", "2026-01-23")]
 
 
 def plan_ejemplo():
@@ -149,3 +151,27 @@ def test_rechaza_bloque_sin_esquema():
     base[0] = pd.DataFrame([{"pnl_usd": 100}])
     with pytest.raises(ValueError, match="bloque de operaciones inválido"):
         ejecutar(base=base)
+
+
+@pytest.mark.parametrize("indice,fecha", [
+    (1, date(2026, 1, 3)),   # Sábado entre dos sesiones válidas
+    (11, date(2026, 1, 19)), # Festivo bursátil estadounidense
+])
+def test_rechaza_dias_no_bursatiles_aunque_estan_ordenados(indice, fecha):
+    sesiones = sesiones_ejemplo()
+    sesiones[indice] = fecha
+    with pytest.raises(ValueError, match="calendario XNYS"):
+        ejecutar(sesiones=sesiones)
+
+
+def test_rechaza_sesion_faltante_aunque_fechas_restantes_sean_validas():
+    sesiones = sesiones_ejemplo()
+    sesiones.pop(7)
+    with pytest.raises(ValueError, match="calendario XNYS"):
+        ejecutar(sesiones=sesiones)
+
+
+def test_acepta_15_sesiones_reales_xnys_con_feriado_intermedio():
+    resultado = ejecutar()
+    assert resultado["comparacion"]["baseline"]["operaciones"] == 3
+    assert resultado["plan"]["fin_prueba"] == date(2026, 1, 23).isoformat()
