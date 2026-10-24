@@ -22,8 +22,9 @@ ADVERTENCIA_REPORTE = (
     "La huella del plan debe haberse comprometido externamente ANTES de "
     "observar OOS. Comprobarla aquí no acredita fecha de registro, "
     "autenticidad del dataset ni de los parámetros declarados. "
-    "Las fechas se contrastan con sesiones XNYS completas; "
-    "esto no verifica la calidad, origen ni cobertura intradía del dataset. "
+    "Fechas y horas de operaciones se contrastan con sesiones regulares "
+    "XNYS y cierres anticipados; esto no verifica calidad, origen, "
+    "costes ni cobertura intradía del dataset. "
     "Las métricas son descriptivas, no demuestran rentabilidad."
 )
 
@@ -76,6 +77,16 @@ def comparar_plan_registrado_oos(
         raise ValueError("Cantidad de bloques no coincide con las ventanas registradas")
 
     universo = set(normalizado["universo"])
+    # Las fechas OOS válidas no bastan: una operación puede estar fechada
+    # correctamente y aun así ocurrir fuera de la sesión regular o después
+    # de un cierre anticipado. Validar ambos extremos en UTC, por sesión.
+    horarios = {
+        fecha: (
+            mercado.session_open(pd.Timestamp(fecha)),
+            mercado.session_close(pd.Timestamp(fecha)),
+        )
+        for fecha in fechas
+    }
     for nombre, bloques in (("baseline", base), ("candidata", candidata)):
         for bloque in bloques:
             if not isinstance(bloque, pd.DataFrame) or "symbol" not in bloque:
@@ -84,6 +95,29 @@ def comparar_plan_registrado_oos(
                 lambda s: isinstance(s, str) and s in universo
             ).all():
                 raise ValueError(f"{nombre}: símbolo fuera del universo registrado")
+            if bloque.empty:
+                continue
+            for campo in ("entrada_timestamp", "salida_timestamp"):
+                if campo not in bloque.columns:
+                    raise ValueError(f"{nombre}: falta {campo}")
+                try:
+                    marcas = [pd.Timestamp(valor) for valor in bloque[campo]]
+                except (ValueError, TypeError, OverflowError) as exc:
+                    raise ValueError(f"{nombre}: {campo} ilegible") from exc
+                if any(pd.isna(ts) or ts.tzinfo is None for ts in marcas):
+                    raise ValueError(f"{nombre}: {campo} requiere zona horaria")
+                for ts in marcas:
+                    fecha_local = ts.tz_convert("America/New_York").date()
+                    limites = horarios.get(fecha_local)
+                    if limites is None:
+                        raise ValueError(f"{nombre}: operación fuera de sesión XNYS")
+                    apertura, cierre = limites
+                    if not (apertura <= ts <= cierre) or (
+                        campo == "entrada_timestamp" and ts == cierre
+                    ):
+                        raise ValueError(
+                            f"{nombre}: {campo} fuera de horario regular XNYS"
+                        )
 
     resultado = comparar_baseline_oos(
         ventanas, base, candidata,

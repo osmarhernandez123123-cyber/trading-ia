@@ -37,8 +37,8 @@ def plan_ejemplo():
     }
 
 
-def bloques_ejemplo(pnl):
-    fechas = sesiones_ejemplo()
+def bloques_ejemplo(pnl, fechas=None):
+    fechas = sesiones_ejemplo() if fechas is None else fechas
     bloques = []
     for i in (9, 11, 13):
         entrada = pd.Timestamp(f"{fechas[i].isoformat()} 10:00", tz="America/New_York")
@@ -175,3 +175,60 @@ def test_acepta_15_sesiones_reales_xnys_con_feriado_intermedio():
     resultado = ejecutar()
     assert resultado["comparacion"]["baseline"]["operaciones"] == 3
     assert resultado["plan"]["fin_prueba"] == date(2026, 1, 23).isoformat()
+
+
+@pytest.mark.parametrize("campo,hora", [
+    ("entrada_timestamp", "09:29"),  # Antes de la apertura regular.
+    ("entrada_timestamp", "16:00"),  # No iniciar al cierre.
+    ("salida_timestamp", "16:01"),   # Después del cierre.
+])
+def test_rechaza_operaciones_fuera_de_horario_regular_xnys(campo, hora):
+    base = bloques_ejemplo(100)
+    dia = base[0].loc[0, "entrada_timestamp"].date()
+    base[0].loc[0, campo] = pd.Timestamp(
+        f"{dia.isoformat()} {hora}", tz="America/New_York"
+    )
+    with pytest.raises(ValueError, match="horario regular XNYS"):
+        ejecutar(base=base)
+
+
+def _caso_cierre_anticipado():
+    mercado = xcals.get_calendar("XNYS")
+    fechas = [
+        ts.date() for ts in mercado.sessions_in_range(
+            "2026-11-10", "2026-12-01"
+        )
+    ]
+    assert len(fechas) == 15
+    assert fechas[12] == date(2026, 11, 27)  # Día después de Thanksgiving.
+    assert mercado.session_close(pd.Timestamp(fechas[12])).tz_convert(
+        "America/New_York"
+    ).hour == 13
+    plan = plan_ejemplo()
+    plan["inicio_prueba"] = fechas[9].isoformat()
+    plan["fin_prueba"] = fechas[14].isoformat()
+    return plan, fechas, bloques_ejemplo(100, fechas), bloques_ejemplo(50, fechas)
+
+
+def test_rechaza_entrada_despues_de_cierre_anticipado():
+    plan, fechas, base, candidata = _caso_cierre_anticipado()
+    base[1].loc[0, "entrada_timestamp"] = pd.Timestamp(
+        "2026-11-27 13:01", tz="America/New_York"
+    )
+    base[1].loc[0, "salida_timestamp"] = pd.Timestamp(
+        "2026-11-27 13:02", tz="America/New_York"
+    )
+    with pytest.raises(ValueError, match="horario regular XNYS"):
+        ejecutar(plan, sesiones=fechas, base=base, candidata=candidata)
+
+
+def test_acepta_salida_exacta_al_cierre_anticipado():
+    plan, fechas, base, candidata = _caso_cierre_anticipado()
+    base[1].loc[0, "entrada_timestamp"] = pd.Timestamp(
+        "2026-11-27 12:55", tz="America/New_York"
+    )
+    base[1].loc[0, "salida_timestamp"] = pd.Timestamp(
+        "2026-11-27 13:00", tz="America/New_York"
+    )
+    resultado = ejecutar(plan, sesiones=fechas, base=base, candidata=candidata)
+    assert resultado["comparacion"]["baseline"]["operaciones"] == 3
