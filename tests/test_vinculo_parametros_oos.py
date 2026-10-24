@@ -32,9 +32,12 @@ def plan_ejemplo():
     }
 
 
-def verificar(plan=None, *, base=BASE, candidata=CANDIDATA, esperado=None):
+_AUTO = object()
+
+
+def verificar(plan=None, *, base=BASE, candidata=CANDIDATA, esperado=_AUTO):
     plan = plan_ejemplo() if plan is None else plan
-    esperado = registrar_plan_oos(plan)["plan_sha256"] if esperado is None else esperado
+    esperado = registrar_plan_oos(plan)["plan_sha256"] if esperado is _AUTO else esperado
     return verificar_parametros_oos(
         plan, plan_sha256_esperado=esperado,
         baseline_bytes=base, candidata_bytes=candidata,
