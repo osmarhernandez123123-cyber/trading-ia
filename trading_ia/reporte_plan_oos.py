@@ -6,6 +6,7 @@ La comparación es descriptiva y no valida rentabilidad.
 from __future__ import annotations
 
 import hmac
+import math
 import re
 from collections.abc import Mapping, Sequence
 from datetime import date
@@ -13,6 +14,7 @@ from datetime import date
 import exchange_calendars as xcals
 import pandas as pd
 
+from .auditoria_costes_oos import ADVERTENCIA as ADVERTENCIA_COSTES, auditar_costes_plan_oos
 from .comparacion_baseline_oos import comparar_baseline_oos
 from .registro_plan_oos import registrar_plan_oos
 from .validacion_temporal import crear_ventanas
@@ -37,6 +39,7 @@ def comparar_plan_registrado_oos(
     baseline_por_ventana: Sequence[pd.DataFrame],
     candidata_por_ventana: Sequence[pd.DataFrame],
     capital_inicial: float = 100_000.0,
+    auditar_costes: bool = False,
 ) -> dict:
     """Comprueba compromiso, construye ventanas y evalúa dos planes fijos.
 
@@ -44,6 +47,8 @@ def comparar_plan_registrado_oos(
     Rechaza diferencias de plan, límites de prueba y símbolos fuera del
     universo declarado ANTES de calcular resultados. No lee ni escribe.
     """
+    if type(auditar_costes) is not bool:
+        raise ValueError("auditar_costes debe ser booleano")
     if not isinstance(plan_sha256_esperado, str) or not re.fullmatch(
         r"[0-9a-f]{64}", plan_sha256_esperado
     ):
@@ -119,16 +124,62 @@ def comparar_plan_registrado_oos(
                             f"{nombre}: {campo} fuera de horario regular XNYS"
                         )
 
+    # Opt-in explícito: sin los siete campos de contabilidad por operación,
+    # incluso en bloques vacíos, la auditoría falla en lugar de inferir costes.
+    auditoria_costes = None
+    if auditar_costes:
+        auditoria_costes = {
+            "plan_sha256": registro["plan_sha256"],
+            "coste_bps_por_lado": normalizado["coste_bps_por_lado"],
+            "advertencia": ADVERTENCIA_COSTES,
+        }
+        for nombre, bloques in (("baseline", base), ("candidata", candidata)):
+            por_ventana = []
+            for indice, bloque in enumerate(bloques, start=1):
+                try:
+                    informe = auditar_costes_plan_oos(
+                        plan,
+                        plan_sha256_esperado=plan_sha256_esperado,
+                        operaciones=bloque,
+                    )
+                except ValueError as exc:
+                    raise ValueError(
+                        f"{nombre} bloque {indice}: auditoría de costes: {exc}"
+                    ) from exc
+                por_ventana.append({
+                    "bloque": indice,
+                    "operaciones_auditadas": informe["operaciones_auditadas"],
+                    "coste_total_declarado_usd": informe["coste_total_declarado_usd"],
+                })
+            try:
+                coste_total = math.fsum(
+                    item["coste_total_declarado_usd"] for item in por_ventana
+                )
+            except OverflowError as exc:
+                raise ValueError("Coste OOS agregado no finito") from exc
+            if not math.isfinite(coste_total):
+                raise ValueError("Coste OOS agregado no finito")
+            auditoria_costes[nombre] = {
+                "operaciones_auditadas": sum(
+                    item["operaciones_auditadas"] for item in por_ventana
+                ),
+                "coste_total_declarado_usd": coste_total,
+                "por_ventana": por_ventana,
+            }
+
     resultado = comparar_baseline_oos(
         ventanas, base, candidata,
         id_baseline=normalizado["baseline_id"],
         id_candidata=normalizado["candidata_id"],
         capital_inicial=capital_inicial,
     )
-    return {
+    reporte = {
         "schema_version": 1,
         "plan_sha256": registro["plan_sha256"],
         "plan": normalizado,
         "comparacion": resultado,
         "advertencia": ADVERTENCIA_REPORTE,
     }
+    if auditoria_costes is not None:
+        reporte["auditoria_costes"] = auditoria_costes
+    return reporte
