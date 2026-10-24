@@ -21,8 +21,12 @@ La función recibe:
 Antes de evaluar métricas, la función verifica la huella SHA-256, reconstruye
 las ventanas a partir de la configuración declarada, comprueba que el inicio
 y fin de prueba correspondan a las fechas registradas, exige un bloque por
-ventana y rechaza símbolos ajenos al universo congelado. Los validadores OOS
-existentes revisan timestamps, riesgo, R y duplicados. Devuelve el plan
+ventana y rechaza símbolos ajenos al universo congelado. También exige que
+cada entrada esté dentro de la sesión regular XNYS **antes del cierre** y
+que cada salida ocurra entre apertura y cierre inclusive, respetando cierres
+anticipados (por ejemplo, 13:00 hora de Nueva York el día posterior a
+Thanksgiving). Los validadores OOS existentes revisan timestamps, riesgo,
+R, duplicados y ausencia de posiciones nocturnas. Devuelve el plan
 normalizado, su huella y el resultado descriptivo.
 
 ## Uso (sin ejecutar órdenes)
@@ -48,9 +52,11 @@ constituyen evidencia de una ventaja económica.
 La comparación no verifica que los hashes declarados correspondan a archivos
 reales, que el universo haya sido conocido point-in-time, que los costes
 correspondan a fills, ni que el compromiso se haya publicado antes de
-observar resultados. La validación de calendario comprueba únicamente fechas y continuidad
-XNYS; **no** verifica horas de mercado, cobertura minuto a minuto, calidad
-de barras, procedencia ni licencia del dataset.
+observar resultados. La validación de calendario y horarios comprueba sesiones XNYS y límites
+de apertura/cierre de cada operación, incluidos cierres anticipados; **no**
+verifica la existencia de transacciones o barras en cada minuto, ni fills,
+slippage, costes netos, cobertura intradía, calidad de barras, procedencia
+ni licencia del dataset.
 No impide que alguien cambie simultáneamente el plan y la huella suministrada;
 esa amenaza requiere un registro externo inmutable y fechado. No se calculan
 p-valores ni se elige un ganador. Una comparación con datos sintéticos no
