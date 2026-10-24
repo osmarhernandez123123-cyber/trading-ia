@@ -92,6 +92,39 @@ def _verificar_consistencia_comparacion(comparacion: dict, plan: dict) -> None:
         if suma != agregado["operaciones"]:
             raise ValueError(f"Total de operaciones {nombre} inconsistente")
 
+    # No confiar en una diferencia descriptiva adulterada aunque el SHA del
+    # reporte se haya vuelto a calcular: debe derivarse de las medias R
+    # declaradas en los resúmenes de la MISMA ventana.
+    def expectativa_valida(valor: object, operaciones: int) -> bool:
+        return (valor is None if operaciones == 0 else
+                type(valor) in (int, float) and math.isfinite(valor))
+
+    for indice, (fila, b, c) in enumerate(zip(
+        filas, comparacion["baseline"]["por_ventana"],
+        comparacion["candidata"]["por_ventana"],
+    ), start=1):
+        for nombre, bloque in (("baseline", b), ("candidata", c)):
+            cantidad = bloque["operaciones"]
+            expectativa = bloque.get("expectativa_r")
+            campo = f"expectativa_r_{nombre}"
+            declarada = fila.get(campo)
+            if ("expectativa_r" not in bloque
+                    or not expectativa_valida(expectativa, cantidad)
+                    or campo not in fila
+                    or not expectativa_valida(declarada, cantidad)
+                    or declarada != expectativa):
+                raise ValueError(f"Expectativa R {nombre} inconsistente en ventana {indice}")
+        delta = (c["expectativa_r"] - b["expectativa_r"]
+                 if b["operaciones"] and c["operaciones"] else None)
+        if delta is not None and not math.isfinite(delta):
+            raise ValueError(f"Diferencia media R no finita en ventana {indice}")
+        campo = "diferencia_media_r_descriptiva"
+        declarado = fila.get(campo)
+        if (campo not in fila
+                or not expectativa_valida(declarado, int(delta is not None))
+                or declarado != delta):
+            raise ValueError(f"Diferencia media R inconsistente en ventana {indice}")
+
 def verificar_artefacto_oos(
     contenido: bytes,
     *,
