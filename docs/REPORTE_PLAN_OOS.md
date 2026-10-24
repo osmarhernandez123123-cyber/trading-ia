@@ -12,8 +12,9 @@ La función recibe:
 - `plan_sha256_esperado`, copiado de un compromiso **externo y anterior a la
   observación de OOS**; no calcularlo en el mismo instante de la comparación
   como supuesto comprobante de pre-registro.
-- Una secuencia estrictamente ordenada de **fechas de sesiones bursátiles ya
-  verificadas** (no días calendario arbitrarios en producción).
+- Una secuencia estrictamente ordenada y **completa** de sesiones del
+  calendario XNYS entre su primera y última fecha. Se rechazan fines de
+  semana, festivos, fechas omitidas y rangos fuera del calendario.
 - Dos secuencias de DataFrames de operaciones intradía, una por estrategia,
   en el orden de las ventanas construidas con el plan.
 
@@ -38,16 +39,18 @@ reporte = comparar_plan_registrado_oos(
 )
 ```
 
-Los tests de `tests/test_reporte_plan_oos.py` usan fechas artificiales para
-probar índices y operaciones sintéticas; **no son un calendario bursátil
-real** ni evidencia de una ventaja económica.
+Los tests de `tests/test_reporte_plan_oos.py` usan fechas de sesiones XNYS
+reales con **operaciones y resultados completamente sintéticos**; no
+constituyen evidencia de una ventaja económica.
 
 ## Límites
 
 La comparación no verifica que los hashes declarados correspondan a archivos
 reales, que el universo haya sido conocido point-in-time, que los costes
 correspondan a fills, ni que el compromiso se haya publicado antes de
-observar resultados. No valida por sí misma el calendario bursátil.
+observar resultados. La validación de calendario comprueba únicamente fechas y continuidad
+XNYS; **no** verifica horas de mercado, cobertura minuto a minuto, calidad
+de barras, procedencia ni licencia del dataset.
 No impide que alguien cambie simultáneamente el plan y la huella suministrada;
 esa amenaza requiere un registro externo inmutable y fechado. No se calculan
 p-valores ni se elige un ganador. Una comparación con datos sintéticos no
