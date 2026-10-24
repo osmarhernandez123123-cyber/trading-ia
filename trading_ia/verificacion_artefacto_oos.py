@@ -96,8 +96,14 @@ def _verificar_consistencia_comparacion(comparacion: dict, plan: dict) -> None:
     # reporte se haya vuelto a calcular: debe derivarse de las medias R
     # declaradas en los resúmenes de la MISMA ventana.
     def expectativa_valida(valor: object, operaciones: int) -> bool:
-        return (valor is None if operaciones == 0 else
-                type(valor) in (int, float) and math.isfinite(valor))
+        if operaciones == 0:
+            return valor is None
+        if type(valor) not in (int, float):
+            return False
+        try:
+            return math.isfinite(valor)
+        except OverflowError:  # JSON permite enteros demasiado grandes para float.
+            return False
 
     for indice, (fila, b, c) in enumerate(zip(
         filas, comparacion["baseline"]["por_ventana"],
