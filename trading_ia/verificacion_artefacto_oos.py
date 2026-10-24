@@ -131,18 +131,70 @@ def _verificar_consistencia_comparacion(comparacion: dict, plan: dict) -> None:
                 or declarado != delta):
             raise ValueError(f"Diferencia media R inconsistente en ventana {indice}")
 
+def _verificar_calendario_ventanas(comparacion: dict, plan: dict) -> None:
+    """Contrasta bloques declarados con sesiones XNYS; no reconstruye trades.
+
+    Es una comprobación opt-in independiente de los resúmenes de operaciones.
+    No verifica entrenamiento, embargos, procedencia ni calidad del dataset.
+    """
+    from datetime import date
+
+    import exchange_calendars as xcals
+
+    def fecha_iso(valor: object) -> date:
+        if not isinstance(valor, str) or re.fullmatch(r"[0-9]{4}-[0-9]{2}-[0-9]{2}", valor) is None:
+            raise ValueError("Fecha de ventana no es ISO canónica")
+        try:
+            fecha = date.fromisoformat(valor)
+        except ValueError as exc:
+            raise ValueError("Fecha de ventana inválida") from exc
+        if fecha.isoformat() != valor:
+            raise ValueError("Fecha de ventana no es ISO canónica")
+        return fecha
+
+    inicio = fecha_iso(plan["inicio_prueba"])
+    fin = fecha_iso(plan["fin_prueba"])
+    try:
+        mercado = xcals.get_calendar("XNYS")
+        sesiones = tuple(
+            sesion.date() for sesion in mercado.sessions_in_range(inicio, fin)
+        )
+    except (ValueError, TypeError, OverflowError) as exc:
+        raise ValueError("Rango de ventanas fuera del calendario XNYS") from exc
+    if not sesiones:
+        raise ValueError("No hay sesiones XNYS en el rango de prueba")
+    posiciones = {fecha: indice for indice, fecha in enumerate(sesiones)}
+    prueba = plan["ventanas"]["prueba"]
+    paso = plan["ventanas"]["paso"]
+    inicio_anterior = None
+    for numero, fila in enumerate(comparacion["por_ventana"], start=1):
+        inicio_bloque = fecha_iso(fila["inicio_prueba"])
+        fin_bloque = fecha_iso(fila["fin_prueba"])
+        if inicio_bloque not in posiciones or fin_bloque not in posiciones:
+            raise ValueError(f"Ventana {numero}: fecha fuera de sesiones XNYS")
+        a, b = posiciones[inicio_bloque], posiciones[fin_bloque]
+        if b - a + 1 != prueba:
+            raise ValueError(f"Ventana {numero}: longitud de prueba no coincide con plan")
+        if inicio_anterior is not None and a - inicio_anterior != paso:
+            raise ValueError(f"Ventana {numero}: avance de sesiones no coincide con plan")
+        inicio_anterior = a
+
+
 def verificar_artefacto_oos(
     contenido: bytes,
     *,
     reporte_sha256_esperado: str,
     plan_sha256_esperado: str,
     dataset_sha256_esperado: str,
+    verificar_calendario: bool = False,
 ) -> dict:
     """Verifica bytes y cadena declarada reporte -> plan -> dataset.
 
     Los tres hashes esperados deben proceder de referencias independientes;
     pasar hashes recién calculados del propio contenido no aporta garantía.
     """
+    if type(verificar_calendario) is not bool:
+        raise ValueError("verificar_calendario debe ser booleano")
     esperado_reporte = _sha(reporte_sha256_esperado, "reporte_sha256_esperado")
     esperado_plan = _sha(plan_sha256_esperado, "plan_sha256_esperado")
     esperado_dataset = _sha(dataset_sha256_esperado, "dataset_sha256_esperado")
@@ -170,6 +222,8 @@ def verificar_artefacto_oos(
         raise ValueError("Falta plan registrado en reporte")
     registro = registrar_plan_oos(plan)
     _verificar_consistencia_comparacion(reporte["comparacion"], registro["plan"])
+    if verificar_calendario:
+        _verificar_calendario_ventanas(reporte["comparacion"], registro["plan"])
     huella_plan = _sha(reporte.get("plan_sha256"), "plan_sha256 del reporte")
     if (not hmac.compare_digest(huella_plan, registro["plan_sha256"])
             or not hmac.compare_digest(huella_plan, esperado_plan)):
@@ -183,6 +237,7 @@ def verificar_artefacto_oos(
         "plan_sha256": huella_plan,
         "dataset_sha256_declarado": huella_dataset,
         "reporte_bytes": len(contenido),
+        "calendario_xnys_verificado": verificar_calendario,
         "advertencia": (
             "Integridad de bytes y coherencia de huellas declaradas; "
             "no verifica dataset real, fills, fecha de preregistro ni rentabilidad."
@@ -196,6 +251,8 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--sha256-reporte-esperado", required=True)
     parser.add_argument("--sha256-plan-esperado", required=True)
     parser.add_argument("--sha256-dataset-esperado", required=True)
+    parser.add_argument("--verificar-calendario", action="store_true",
+                        help="Contrastar longitud y avance de ventanas con sesiones XNYS")
     args = parser.parse_args(argv)
     with args.reporte.open("rb") as archivo:
         contenido = archivo.read(MAX_REPORTE_BYTES + 1)
@@ -204,6 +261,7 @@ def main(argv: list[str] | None = None) -> int:
         reporte_sha256_esperado=args.sha256_reporte_esperado,
         plan_sha256_esperado=args.sha256_plan_esperado,
         dataset_sha256_esperado=args.sha256_dataset_esperado,
+        verificar_calendario=args.verificar_calendario,
     )
     print(json.dumps(resultado, ensure_ascii=False, sort_keys=True))
     return 0
