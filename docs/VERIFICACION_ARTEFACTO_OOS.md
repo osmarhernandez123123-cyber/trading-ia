@@ -51,6 +51,31 @@ PnL, medias R desde operaciones o rentabilidad**: una estructura coherente
 puede contener cifras falsas.
 El fixture de pruebas representa solo coherencia estructural sintética.
 
+## Calendario de ventanas XNYS (opt-in)
+
+Con `verificar_calendario=True` o el argumento CLI
+`--verificar-calendario`, el verificador contrasta **las fechas de prueba
+declaradas** con el calendario local `exchange_calendars` para XNYS.
+Exige que inicio y fin de cada ventana sean sesiones bursátiles, que cada
+bloque contenga exactamente `plan["ventanas"]["prueba"]` sesiones
+(incluyendo cierres anticipados) y que el inicio del bloque siguiente avance
+exactamente `plan["ventanas"]["paso"]` sesiones. Esto detecta fines de
+semana, festivos, duraciones falsas y saltos incompatibles aunque el reporte
+sea internamente coherente y se recalculen sus hashes.
+
+Se mantiene **desactivado por defecto** para no alterar la compatibilidad
+de verificaciones estructurales antiguas ni dar validez bursátil a sus
+fixtures artificiales. El resultado declara
+`calendario_xnys_verificado: true/false` para evitar confundir ambos modos.
+El calendario se consulta **localmente**, sin conexión a brokers ni órdenes.
+
+Este control **no** reconstruye las ventanas de entrenamiento, validación o
+embargo; tampoco prueba cobertura OHLCV, timestamps intradía, calidad,
+procedencia, ejecución, rentabilidad ni preregistro. El fixture de
+`test_verificacion_artefacto_oos.py` sigue siendo artificial; las pruebas
+de calendario usan otras fechas sintéticas que sí corresponden a sesiones
+XNYS conocidas.
+
 ## Límites de seguridad y alcance
 
 La verificación confirma que **el reporte no cambió respecto a la huella
