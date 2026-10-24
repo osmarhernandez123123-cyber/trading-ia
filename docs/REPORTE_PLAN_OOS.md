@@ -47,6 +47,38 @@ Los tests de `tests/test_reporte_plan_oos.py` usan fechas de sesiones XNYS
 reales con **operaciones y resultados completamente sintéticos**; no
 constituyen evidencia de una ventaja económica.
 
+## Auditoría opcional de costes declarados
+
+El parámetro `auditar_costes=True` activa la auditoría aritmética del PR #26
+**antes** de calcular métricas, para **ambas** estrategias y **todas** las
+ventanas. Cada bloque, incluso vacío, debe incluir los siete campos de
+`auditar_costes_plan_oos`: `nocional_entrada_usd`,
+`nocional_salida_usd`, `pnl_bruto_usd`, `coste_total_usd`, `pnl_usd`,
+`riesgo_total` y `R`. Ante campos faltantes o contabilidad incompatible,
+se rechaza todo el reporte, indicando estrategia y bloque. No se infieren
+costes desde el PnL neto. El resultado añade `auditoria_costes` con la
+huella del plan, coste por lado, conteos y costes declarados por ventana y
+por estrategia. La suma total se comprueba contra overflow.
+
+El valor predeterminado es `False`, por compatibilidad con reportes OOS
+anteriores; en ese caso no se añade `auditoria_costes` ni se afirma que
+los costes hayan sido auditados. Para activar la comprobación:
+
+```python
+reporte = comparar_plan_registrado_oos(
+    plan_predefinido,
+    plan_sha256_esperado=huella_externa_previa,
+    sesiones=sesiones_bursatiles_verificadas,
+    baseline_por_ventana=operaciones_baseline_con_costes,
+    candidata_por_ventana=operaciones_candidata_con_costes,
+    auditar_costes=True,
+)
+```
+
+Esta auditoría solo contrasta **campos declarados** con los bps congelados.
+No comprueba ejecuciones, fills, precios, origen del dataset, slippage real,
+ni autenticidad o fecha del compromiso externo.
+
 ## Límites
 
 La comparación no verifica que los hashes declarados correspondan a archivos
