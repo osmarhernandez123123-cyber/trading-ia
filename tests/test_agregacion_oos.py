@@ -117,3 +117,15 @@ def test_rechaza_fechas_duplicadas_dentro_de_ventana():
     bad = replace(v[0], prueba=(v[0].prueba[0], v[0].prueba[0]))
     with pytest.raises(ValueError, match="duplicadas"):
         agregar_pruebas([bad], [bloques()[0]])
+
+
+def test_rechaza_overflow_ponderado_entre_ventanas_validas():
+    # Cada ventana aislada produce métricas finitas, pero 1e308 + 1e308
+    # desborda la suma ponderada. Solo datos sintéticos.
+    v = ventanas()
+    b = [
+        pd.DataFrame([operacion(8, 30, 1e8, riesgo=1e-300)]),
+        pd.DataFrame([operacion(10, 30, 1e8, riesgo=1e-300)]),
+    ]
+    with pytest.raises(ValueError, match="agregadas no finitas"):
+        agregar_pruebas(v, b)

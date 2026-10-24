@@ -16,6 +16,8 @@ pueden ser sintéticos. No consulta mercado, no lee credenciales y no envía ór
   drawdown combinado: las curvas individuales reinician capital.
 - Calcula media R ponderada por número de operaciones, no media simple
   entre ventanas. Devuelve número de ventanas con y sin operaciones.
+- Rechaza PnL sumado o expectativa R ponderada no finitos por overflow
+  **entre ventanas**, incluso si cada bloque individual pasó validación.
 - Añade un intervalo Wilson nominal del 95 % para la proporción de
   operaciones ganadoras; **no** es una inferencia fiable cuando existen
   correlaciones temporales, dependencia entre símbolos o selección de modelos.
