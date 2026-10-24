@@ -94,7 +94,12 @@ def test_rechaza_modificacion_de_plan_con_compromiso_original():
 @pytest.mark.parametrize("huella", ["A" * 64, "0" * 63, "", None])
 def test_rechaza_huella_ambigua(huella):
     with pytest.raises(ValueError, match="plan_sha256_esperado"):
-        ejecutar(huella=huella)
+        comparar_plan_registrado_oos(
+            plan_ejemplo(), plan_sha256_esperado=huella,
+            sesiones=sesiones_ejemplo(),
+            baseline_por_ventana=bloques_ejemplo(100),
+            candidata_por_ventana=bloques_ejemplo(50),
+        )
 
 
 def test_rechaza_limites_oos_aunque_plan_tenga_huella_valida():
