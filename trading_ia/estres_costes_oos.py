@@ -51,8 +51,14 @@ def evaluar_estres_costes(
     )
     if "nocional" not in operaciones.columns:
         raise ValueError("Falta columna nocional para estrés de costes")
+    # Evitar coerción silenciosa: "1000" y True no son nocionales válidos.
+    if not operaciones["nocional"].map(
+        lambda v: isinstance(v, (int, float, np.integer, np.floating))
+        and not isinstance(v, (bool, np.bool_))
+    ).all():
+        raise ValueError("nocional requiere valores numéricos, no texto o booleanos")
     try:
-        nocional = pd.to_numeric(operaciones["nocional"], errors="coerce").to_numpy(
+        nocional = pd.to_numeric(operaciones["nocional"], errors="raise").to_numpy(
             dtype=float
         )
     except (ValueError, TypeError, OverflowError) as exc:
@@ -60,9 +66,18 @@ def evaluar_estres_costes(
     if not np.isfinite(nocional).all() or (nocional <= 0).any():
         raise ValueError("nocional debe ser finito y positivo")
 
-    ajuste = 2 * nocional * float(coste_extra_bps_lado) / 10_000
+    # Calcular primero el factor evita desbordar en 2*nocional aunque el
+    # coste final sí sea representable. Validar también la suma agregada.
+    factor = 2 * (float(coste_extra_bps_lado) / 10_000)
+    if not math.isfinite(factor):
+        raise ValueError("Coste incremental no finito")
+    with np.errstate(over="ignore", invalid="ignore"):
+        ajuste = nocional * factor
+        coste_total = float(np.sum(ajuste, dtype=np.float64))
     if not np.isfinite(ajuste).all():
         raise ValueError("Coste incremental no finito")
+    if not math.isfinite(coste_total):
+        raise ValueError("Coste incremental agregado no finito")
 
     ajustadas = operaciones.copy(deep=True)
     pnl = pd.to_numeric(ajustadas["pnl_usd"], errors="coerce").to_numpy(dtype=float)
@@ -80,7 +95,7 @@ def evaluar_estres_costes(
     return {
         "schema_version": 1,
         "coste_extra_bps_lado": float(coste_extra_bps_lado),
-        "coste_extra_total_usd": float(ajuste.sum()),
+        "coste_extra_total_usd": coste_total,
         "baseline": base,
         "estresado": estresado,
         "advertencia": ADVERTENCIA_COSTES,
