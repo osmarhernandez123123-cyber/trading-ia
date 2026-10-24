@@ -6,7 +6,7 @@ Cada ventana se evalúa con el validador OOS existente antes de agregar.
 from __future__ import annotations
 
 from datetime import date
-from math import sqrt
+from math import isfinite, sqrt
 from typing import Sequence
 
 import pandas as pd
@@ -88,6 +88,12 @@ def agregar_pruebas(
         r["expectativa_r"] * r["operaciones"]
         for r in resumenes if r["operaciones"]
     )
+    expectativa_ponderada = float(suma_r / n) if n else None
+    # Cada ventana puede ser finita y aun así desbordar al sumar entre
+    # ventanas o ponderar por operaciones. Nunca publicar inf/NaN como métrica.
+    if not (isfinite(pnl) and isfinite(suma_r)
+            and (expectativa_ponderada is None or isfinite(expectativa_ponderada))):
+        raise ValueError("Métricas OOS agregadas no finitas")
     return {
         "schema_version": 1,
         "ventanas": len(resumenes),
@@ -97,7 +103,7 @@ def agregar_pruebas(
         "perdedoras": sum(r["perdedoras"] for r in resumenes),
         "neutras": sum(r["neutras"] for r in resumenes),
         "pnl_realizado_suma_usd": float(pnl),
-        "expectativa_r_ponderada": float(suma_r / n) if n else None,
+        "expectativa_r_ponderada": expectativa_ponderada,
         "tasa_acierto_pct": 100 * ganadoras / n if n else None,
         "intervalo_wilson_95_pct": _intervalo_wilson(ganadoras, n),
         "min_operaciones_ventana": min(r["operaciones"] for r in resumenes),
