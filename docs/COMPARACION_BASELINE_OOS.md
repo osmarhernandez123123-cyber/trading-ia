@@ -17,7 +17,8 @@ incluidos fixtures sintéticos. No consulta mercado, broker ni credenciales.
 3. Leer la expectativa R ponderada, el tamaño de muestra y los resúmenes
    individuales. La diferencia de media R **por ventana** se muestra solo
    cuando ambos modelos tienen operaciones; sin operaciones se devuelve null,
-   nunca una expectativa ficticia de cero.
+   nunca una expectativa ficticia de cero. Si la resta de dos medias finitas
+   desborda a infinito, el reporte falla explícitamente en vez de publicar inf.
 4. No se devuelve ranking, p-valor, intervalo para diferencias ni recomendación
    de compra. Una comparación no autoriza seleccionar una estrategia usando
    el conjunto de prueba. Si se utiliza el OOS para escoger o ajustar modelos,
