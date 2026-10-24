@@ -111,3 +111,21 @@ def test_capital_inicial_debe_ser_valido_para_ambos():
             ventanas(), b, c, id_baseline="a", id_candidata="b",
             capital_inicial=float("nan"),
         )
+
+
+def test_rechaza_overflow_en_delta_con_medias_individuales_finitas():
+    # Ambos modelos pasan sus métricas OOS por separado; +1e308 - (-1e308)
+    # no es una diferencia finita. No hay precios ni órdenes reales.
+    v = ventanas()
+    base, candidata = bloques()
+    base[0] = pd.DataFrame([trade(8, -1e8)])
+    candidata[0] = pd.DataFrame([trade(8, 1e8)])
+    base[0].loc[0, "riesgo_total"] = 1e-300
+    candidata[0].loc[0, "riesgo_total"] = 1e-300
+    base[0].loc[0, "R"] = -1e308
+    candidata[0].loc[0, "R"] = 1e308
+    base[1] = base[1].iloc[:0].copy()
+    candidata[1] = candidata[1].iloc[:0].copy()
+
+    with pytest.raises(ValueError, match="Diferencia media R descriptiva no finita"):
+        comparar(v, base, candidata)
