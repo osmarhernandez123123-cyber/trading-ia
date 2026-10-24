@@ -99,7 +99,17 @@ def evaluar_prueba(
         raise ValueError("Operación nocturna no permitida en evaluación intradía")
 
     for campo in ("pnl_usd", "riesgo_total", "R"):
-        df[campo] = pd.to_numeric(df[campo], errors="coerce")
+        # No convertir texto numérico o booleanos a resultados aparentemente
+        # válidos: las métricas deben proceder de un esquema numérico explícito.
+        if not df[campo].map(
+            lambda v: isinstance(v, (int, float, np.integer, np.floating))
+            and not isinstance(v, (bool, np.bool_))
+        ).all():
+            raise ValueError(f"{campo} requiere valores numéricos, no texto o booleanos")
+        try:
+            df[campo] = pd.to_numeric(df[campo], errors="raise").astype("float64")
+        except (ValueError, TypeError, OverflowError) as exc:
+            raise ValueError(f"{campo} no se puede representar como float64") from exc
         if not np.isfinite(df[campo].to_numpy(dtype=float)).all():
             raise ValueError(f"{campo} debe contener valores finitos")
     if not df["riesgo_total"].gt(0).all():
@@ -113,12 +123,19 @@ def evaluar_prueba(
 
     n = len(df)
     pnl = float(df["pnl_usd"].sum())
+    expectativa = float(df["R"].mean())
+    retorno = 100 * pnl / float(capital_inicial)
     # Agrupar salidas simultáneas: el orden arbitrario entre símbolos no
     # debe crear máximos o caídas ficticias.
     pnl_por_salida = df.groupby("salida_timestamp", sort=True)["pnl_usd"].sum()
     capital_realizado = float(capital_inicial) + pnl_por_salida.cumsum()
     picos = capital_realizado.cummax().clip(lower=float(capital_inicial))
     drawdown = float((capital_realizado / picos - 1).min() * 100)
+    # Una suma/media puede desbordar aunque cada operación sea finita.
+    if not (all(math.isfinite(x) for x in (pnl, expectativa, retorno, drawdown))
+            and np.isfinite(pnl_por_salida.to_numpy(dtype=float)).all()
+            and np.isfinite(capital_realizado.to_numpy(dtype=float)).all()):
+        raise ValueError("Métricas OOS agregadas no finitas")
 
     return {
         **base,
@@ -127,8 +144,8 @@ def evaluar_prueba(
         "perdedoras": int(df["pnl_usd"].lt(0).sum()),
         "neutras": int(df["pnl_usd"].eq(0).sum()),
         "pnl_realizado_usd": pnl,
-        "retorno_realizado_pct": 100 * pnl / float(capital_inicial),
+        "retorno_realizado_pct": retorno,
         "tasa_acierto_pct": 100 * float(df["pnl_usd"].gt(0).sum()) / n,
-        "expectativa_r": float(df["R"].mean()),
+        "expectativa_r": expectativa,
         "drawdown_realizado_pct": drawdown,
     }
