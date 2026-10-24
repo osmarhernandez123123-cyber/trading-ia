@@ -15,6 +15,7 @@ import exchange_calendars as xcals
 import pandas as pd
 
 from .auditoria_costes_oos import ADVERTENCIA as ADVERTENCIA_COSTES, auditar_costes_plan_oos
+from .auditoria_riesgo_oos import ADVERTENCIA_RIESGO, auditar_riesgo_oos
 from .comparacion_baseline_oos import comparar_baseline_oos
 from .registro_plan_oos import registrar_plan_oos
 from .validacion_temporal import crear_ventanas
@@ -40,6 +41,7 @@ def comparar_plan_registrado_oos(
     candidata_por_ventana: Sequence[pd.DataFrame],
     capital_inicial: float = 100_000.0,
     auditar_costes: bool = False,
+    auditar_riesgo: bool = False,
 ) -> dict:
     """Comprueba compromiso, construye ventanas y evalúa dos planes fijos.
 
@@ -49,6 +51,8 @@ def comparar_plan_registrado_oos(
     """
     if type(auditar_costes) is not bool:
         raise ValueError("auditar_costes debe ser booleano")
+    if type(auditar_riesgo) is not bool:
+        raise ValueError("auditar_riesgo debe ser booleano")
     if not isinstance(plan_sha256_esperado, str) or not re.fullmatch(
         r"[0-9a-f]{64}", plan_sha256_esperado
     ):
@@ -167,6 +171,44 @@ def comparar_plan_registrado_oos(
                 "por_ventana": por_ventana,
             }
 
+    # Auditoría opcional independiente: límites de política 1%/3% sobre
+    # capital INICIAL fijo, no incluidos en la huella del plan OOS.
+    auditoria_riesgo = None
+    if auditar_riesgo:
+        auditoria_riesgo = {
+            "capital_inicial_usd": float(capital_inicial),
+            "limite_operacion_pct": 1.0,
+            "limite_simultaneo_pct": 3.0,
+            "advertencia": ADVERTENCIA_RIESGO,
+        }
+        for nombre, bloques in (("baseline", base), ("candidata", candidata)):
+            por_ventana = []
+            for indice, (ventana, bloque) in enumerate(zip(ventanas, bloques), start=1):
+                try:
+                    informe = auditar_riesgo_oos(
+                        bloque, ventana, capital_inicial=capital_inicial,
+                        limite_operacion_pct=1.0, limite_simultaneo_pct=3.0,
+                    )
+                except ValueError as exc:
+                    raise ValueError(
+                        f"{nombre} bloque {indice}: auditoría de riesgo: {exc}"
+                    ) from exc
+                por_ventana.append({
+                    "bloque": indice,
+                    "operaciones_auditadas": informe["operaciones"],
+                    "pico_riesgo_simultaneo_usd": informe["pico_riesgo_simultaneo_usd"],
+                })
+            auditoria_riesgo[nombre] = {
+                "operaciones_auditadas": sum(
+                    item["operaciones_auditadas"] for item in por_ventana
+                ),
+                "pico_riesgo_simultaneo_usd": max(
+                    (item["pico_riesgo_simultaneo_usd"] for item in por_ventana),
+                    default=0.0,
+                ),
+                "por_ventana": por_ventana,
+            }
+
     resultado = comparar_baseline_oos(
         ventanas, base, candidata,
         id_baseline=normalizado["baseline_id"],
@@ -182,4 +224,6 @@ def comparar_plan_registrado_oos(
     }
     if auditoria_costes is not None:
         reporte["auditoria_costes"] = auditoria_costes
+    if auditoria_riesgo is not None:
+        reporte["auditoria_riesgo"] = auditoria_riesgo
     return reporte
