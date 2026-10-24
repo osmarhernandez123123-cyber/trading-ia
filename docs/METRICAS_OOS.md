@@ -10,7 +10,10 @@ El DataFrame debe incluir `symbol`, `entrada_timestamp`,
 `trading_ia.backtest.simular`. Requiere timestamps con zona explícita,
 entradas y salidas en las sesiones de prueba (fecha de Nueva York), cierre
 en la misma sesión, riesgo estrictamente positivo y R consistente con
-`pnl_usd / riesgo_total`. **No filtra silenciosamente** operaciones de
+`pnl_usd / riesgo_total`. Rechaza texto numérico y booleanos en las
+columnas de PnL, riesgo y R, así como métricas agregadas no finitas por
+desbordamiento, aunque cada operación individual sea finita.
+**No filtra silenciosamente** operaciones de
 entrenamiento, validación, embargo ni fuera de prueba: las rechaza.
 
 Ejemplo de integración local, después de ejecutar un backtest por separado:
