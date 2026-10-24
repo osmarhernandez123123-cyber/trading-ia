@@ -54,7 +54,8 @@ def bloques_ejemplo(pnl, fechas=None):
     return bloques
 
 
-def ejecutar(plan=None, *, huella=None, base=None, candidata=None, sesiones=None):
+def ejecutar(plan=None, *, huella=None, base=None, candidata=None, sesiones=None,
+            auditar_costes=False):
     plan = plan_ejemplo() if plan is None else plan
     if huella is None:
         huella = registrar_plan_oos(plan)["plan_sha256"]
@@ -63,6 +64,7 @@ def ejecutar(plan=None, *, huella=None, base=None, candidata=None, sesiones=None
         sesiones=sesiones_ejemplo() if sesiones is None else sesiones,
         baseline_por_ventana=bloques_ejemplo(100) if base is None else base,
         candidata_por_ventana=bloques_ejemplo(50) if candidata is None else candidata,
+        auditar_costes=auditar_costes,
     )
 
 
@@ -232,3 +234,48 @@ def test_acepta_salida_exacta_al_cierre_anticipado():
     )
     resultado = ejecutar(plan, sesiones=fechas, base=base, candidata=candidata)
     assert resultado["comparacion"]["baseline"]["operaciones"] == 3
+
+
+def bloques_con_costes(pnl):
+    """Costes y nocionales sintéticos compatibles con 2 bps por lado."""
+    bloques = bloques_ejemplo(pnl)
+    for bloque in bloques:
+        bloque["nocional_entrada_usd"] = 10_000.0
+        bloque["nocional_salida_usd"] = 10_000.0
+        bloque["pnl_bruto_usd"] = float(pnl) + 4.0
+        bloque["coste_total_usd"] = 4.0
+    return bloques
+
+
+def test_auditoria_costes_optin_y_salida_compatible_sin_ella():
+    assert "auditoria_costes" not in ejecutar()
+    base, candidata = bloques_con_costes(100), bloques_con_costes(50)
+    antes = [bloque.copy(deep=True) for bloque in base]
+    resultado = ejecutar(base=base, candidata=candidata, auditar_costes=True)
+    auditoria = resultado["auditoria_costes"]
+    assert auditoria["plan_sha256"] == resultado["plan_sha256"]
+    assert auditoria["coste_bps_por_lado"] == 2.0
+    assert auditoria["baseline"]["operaciones_auditadas"] == 3
+    assert auditoria["baseline"]["coste_total_declarado_usd"] == pytest.approx(12.0)
+    assert auditoria["candidata"]["coste_total_declarado_usd"] == pytest.approx(12.0)
+    assert len(auditoria["baseline"]["por_ventana"]) == 3
+    assert "no comprueba" in auditoria["advertencia"]
+    for bloque, original in zip(base, antes):
+        pd.testing.assert_frame_equal(bloque, original)
+
+
+def test_auditoria_costes_optin_falla_ante_coste_incoherente():
+    base = bloques_con_costes(100)
+    base[0].loc[0, "coste_total_usd"] = 0.0
+    with pytest.raises(ValueError, match="baseline bloque 1: auditoría de costes: Coste declarado"):
+        ejecutar(base=base, candidata=bloques_con_costes(50), auditar_costes=True)
+
+
+def test_auditoria_costes_optin_rechaza_campos_ausentes_sin_inferirlos():
+    with pytest.raises(ValueError, match="auditoría de costes: Columnas"):
+        ejecutar(auditar_costes=True)
+
+
+def test_auditoria_costes_exige_flag_booleano():
+    with pytest.raises(ValueError, match="auditar_costes debe ser booleano"):
+        ejecutar(auditar_costes="si")
