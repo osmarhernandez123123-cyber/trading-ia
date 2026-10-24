@@ -40,16 +40,21 @@ def artefacto():
             "baseline": {
                 "ventanas": 1, "operaciones": 0,
                 "por_ventana": [{"inicio_prueba": "2026-01-05",
-                                 "fin_prueba": "2026-01-30", "operaciones": 0}],
+                                 "fin_prueba": "2026-01-30", "operaciones": 0,
+                                 "expectativa_r": None}],
             },
             "candidata": {
                 "ventanas": 1, "operaciones": 0,
                 "por_ventana": [{"inicio_prueba": "2026-01-05",
-                                 "fin_prueba": "2026-01-30", "operaciones": 0}],
+                                 "fin_prueba": "2026-01-30", "operaciones": 0,
+                                 "expectativa_r": None}],
             },
             "por_ventana": [{"inicio_prueba": "2026-01-05",
                              "fin_prueba": "2026-01-30",
-                             "operaciones_baseline": 0, "operaciones_candidata": 0}],
+                             "operaciones_baseline": 0, "operaciones_candidata": 0,
+                             "expectativa_r_baseline": None,
+                             "expectativa_r_candidata": None,
+                             "diferencia_media_r_descriptiva": None}],
         },
         "advertencia": "datos enteramente sintéticos",
     }
@@ -226,3 +231,74 @@ def test_rechaza_comparacion_incompleta_aunque_tenga_hash_valido():
         lambda reporte: reporte["comparacion"].pop("baseline"),
         "Resumen baseline ausente",
     )
+
+
+def _con_medias_sinteticas():
+    """Cifras inventadas y coherentes; NO prueba ejecución ni rentabilidad."""
+    contenido, hashes = artefacto()
+    reporte = json.loads(contenido)
+    fila = reporte["comparacion"]["por_ventana"][0]
+    for nombre, media in (("baseline", 0.5), ("candidata", 0.25)):
+        agregado = reporte["comparacion"][nombre]
+        agregado["operaciones"] = 1
+        agregado["por_ventana"][0]["operaciones"] = 1
+        agregado["por_ventana"][0]["expectativa_r"] = media
+        fila[f"operaciones_{nombre}"] = 1
+        fila[f"expectativa_r_{nombre}"] = media
+    fila["diferencia_media_r_descriptiva"] = -0.25
+    return reporte, hashes
+
+
+def _verificar_con_nueva_huella(reporte, hashes):
+    serializado = json.dumps(reporte, sort_keys=True).encode()
+    referencias = {**hashes, "reporte_sha256_esperado": hashlib.sha256(serializado).hexdigest()}
+    return verificar_artefacto_oos(serializado, **referencias)
+
+
+def test_acepta_medias_y_diferencia_r_coherentes_sinteticas():
+    reporte, hashes = _con_medias_sinteticas()
+    assert _verificar_con_nueva_huella(reporte, hashes)["schema_version"] == 1
+
+
+@pytest.mark.parametrize("campo,valor,mensaje", [
+    ("expectativa_r_baseline", 0.6, "Expectativa R baseline"),
+    ("expectativa_r_candidata", True, "Expectativa R candidata"),
+    ("diferencia_media_r_descriptiva", 0.25, "Diferencia media R inconsistente"),
+    ("diferencia_media_r_descriptiva", None, "Diferencia media R inconsistente"),
+])
+def test_rechaza_medias_o_delta_alterados_con_hash_recalculado(campo, valor, mensaje):
+    reporte, hashes = _con_medias_sinteticas()
+    reporte["comparacion"]["por_ventana"][0][campo] = valor
+    with pytest.raises(ValueError, match=mensaje):
+        _verificar_con_nueva_huella(reporte, hashes)
+
+
+def test_rechaza_media_de_resumen_distinta_a_comparacion():
+    reporte, hashes = _con_medias_sinteticas()
+    reporte["comparacion"]["baseline"]["por_ventana"][0]["expectativa_r"] = 0.4
+    with pytest.raises(ValueError, match="Expectativa R baseline"):
+        _verificar_con_nueva_huella(reporte, hashes)
+
+
+def test_rechaza_expectativa_no_nula_en_ventana_sin_operaciones():
+    contenido, hashes = artefacto()
+    reporte = json.loads(contenido)
+    reporte["comparacion"]["por_ventana"][0]["expectativa_r_baseline"] = 0.0
+    with pytest.raises(ValueError, match="Expectativa R baseline"):
+        _verificar_con_nueva_huella(reporte, hashes)
+
+
+def test_rechaza_delta_no_finito_derivado_de_medias_finitas():
+    reporte, hashes = _con_medias_sinteticas()
+    for nombre, valor in (("baseline", -1e308), ("candidata", 1e308)):
+        reporte["comparacion"][nombre]["por_ventana"][0]["expectativa_r"] = valor
+        reporte["comparacion"]["por_ventana"][0][f"expectativa_r_{nombre}"] = valor
+    with pytest.raises(ValueError, match="Diferencia media R no finita"):
+        _verificar_con_nueva_huella(reporte, hashes)
+
+
+def test_rechaza_entero_json_enorme_en_media_sin_desbordar_excepcion():
+    reporte, hashes = _con_medias_sinteticas()
+    reporte["comparacion"]["baseline"]["por_ventana"][0]["expectativa_r"] = 10 ** 400
+    with pytest.raises(ValueError, match="Expectativa R baseline"):
+        _verificar_con_nueva_huella(reporte, hashes)
