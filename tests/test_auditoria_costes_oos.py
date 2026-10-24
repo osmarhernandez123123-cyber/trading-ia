@@ -87,6 +87,10 @@ def test_rechaza_cambio_de_coste_en_plan_con_huella_previa():
 ])
 def test_rechaza_contabilidad_inconsistente(campo, valor, mensaje):
     operaciones = operaciones_ejemplo()
+    # pandas reciente rechaza asignar texto/bool a una columna float64;
+    # forzar dtype object solo en el fixture para probar el validador.
+    if isinstance(valor, (str, bool)):
+        operaciones[campo] = operaciones[campo].astype(object)
     operaciones.at[0, campo] = valor
     with pytest.raises(ValueError, match=mensaje):
         auditar(operaciones=operaciones)
