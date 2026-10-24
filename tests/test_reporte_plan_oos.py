@@ -55,7 +55,7 @@ def bloques_ejemplo(pnl, fechas=None):
 
 
 def ejecutar(plan=None, *, huella=None, base=None, candidata=None, sesiones=None,
-            auditar_costes=False):
+            auditar_costes=False, auditar_riesgo=False):
     plan = plan_ejemplo() if plan is None else plan
     if huella is None:
         huella = registrar_plan_oos(plan)["plan_sha256"]
@@ -65,6 +65,7 @@ def ejecutar(plan=None, *, huella=None, base=None, candidata=None, sesiones=None
         baseline_por_ventana=bloques_ejemplo(100) if base is None else base,
         candidata_por_ventana=bloques_ejemplo(50) if candidata is None else candidata,
         auditar_costes=auditar_costes,
+        auditar_riesgo=auditar_riesgo,
     )
 
 
@@ -279,3 +280,59 @@ def test_auditoria_costes_optin_rechaza_campos_ausentes_sin_inferirlos():
 def test_auditoria_costes_exige_flag_booleano():
     with pytest.raises(ValueError, match="auditar_costes debe ser booleano"):
         ejecutar(auditar_costes="si")
+
+
+def test_auditoria_riesgo_optin_conserva_contrato_y_no_muta():
+    assert "auditoria_riesgo" not in ejecutar()
+    base = bloques_ejemplo(100)
+    originales = [bloque.copy(deep=True) for bloque in base]
+    resultado = ejecutar(base=base, auditar_riesgo=True)
+    auditoria = resultado["auditoria_riesgo"]
+    assert auditoria["capital_inicial_usd"] == 100_000.0
+    assert auditoria["limite_operacion_pct"] == 1.0
+    assert auditoria["limite_simultaneo_pct"] == 3.0
+    assert auditoria["baseline"]["operaciones_auditadas"] == 3
+    assert auditoria["baseline"]["pico_riesgo_simultaneo_usd"] == 100.0
+    assert len(auditoria["candidata"]["por_ventana"]) == 3
+    assert "capital inicial fijo" in auditoria["advertencia"]
+    for bloque, original in zip(base, originales):
+        pd.testing.assert_frame_equal(bloque, original)
+
+
+def test_auditoria_riesgo_optin_rechaza_riesgo_individual():
+    base = bloques_ejemplo(100)
+    base[0].loc[0, "riesgo_total"] = 1001.0
+    base[0].loc[0, "R"] = 100.0 / 1001.0
+    with pytest.raises(ValueError, match="baseline bloque 1: auditoría de riesgo: Riesgo por operación"):
+        ejecutar(base=base, auditar_riesgo=True)
+
+
+def test_auditoria_riesgo_optin_rechaza_cuatro_solapadas():
+    base = bloques_ejemplo(100)
+    fila = base[0].iloc[0].to_dict()
+    base[0] = pd.DataFrame([
+        {
+            **fila,
+            "entrada_timestamp": fila["entrada_timestamp"] + pd.Timedelta(minutes=i),
+            "riesgo_total": 1000.0,
+            "R": 0.1,
+        }
+        for i in range(4)
+    ])
+    with pytest.raises(ValueError, match="baseline bloque 1: auditoría de riesgo: Riesgo simultáneo"):
+        ejecutar(base=base, auditar_riesgo=True)
+
+
+def test_auditorias_costes_y_riesgo_optin_son_compatibles():
+    resultado = ejecutar(
+        base=bloques_con_costes(100),
+        candidata=bloques_con_costes(50),
+        auditar_costes=True, auditar_riesgo=True,
+    )
+    assert resultado["auditoria_costes"]["baseline"]["operaciones_auditadas"] == 3
+    assert resultado["auditoria_riesgo"]["baseline"]["operaciones_auditadas"] == 3
+
+
+def test_auditoria_riesgo_exige_flag_booleano():
+    with pytest.raises(ValueError, match="auditar_riesgo debe ser booleano"):
+        ejecutar(auditar_riesgo="si")

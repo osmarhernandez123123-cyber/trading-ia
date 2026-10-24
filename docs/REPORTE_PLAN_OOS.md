@@ -79,6 +79,40 @@ Esta auditoría solo contrasta **campos declarados** con los bps congelados.
 No comprueba ejecuciones, fills, precios, origen del dataset, slippage real,
 ni autenticidad o fecha del compromiso externo.
 
+## Auditoría opcional de riesgo declarado
+
+`auditar_riesgo=True` activa la auditoría descriptiva ya existente de
+`auditoria_riesgo_oos` para **baseline y candidata en cada ventana OOS**.
+Comprueba un máximo de **1% por operación y 3% simultáneo**, ambos sobre el
+**capital inicial fijo** proporcionado al reporte. Las salidas liberan
+presupuesto antes de las entradas con la misma marca temporal; no se
+modifican los DataFrames. Si hay incumplimiento, el reporte completo falla
+con identificación de estrategia y ventana. Puede combinarse con
+`auditar_costes=True`.
+
+`auditar_riesgo` es `False` por defecto. Al activarlo se agrega
+`auditoria_riesgo` con límites, capital inicial, conteos y picos de riesgo
+declarado por ventana y estrategia. Los límites 1%/3% son **política fija
+del auditor**, no parámetros incluidos en la huella SHA-256 del plan;
+esta función no certifica que fueran los límites usados al generar
+las operaciones.
+
+```python
+reporte = comparar_plan_registrado_oos(
+    plan_predefinido,
+    plan_sha256_esperado=huella_externa_previa,
+    sesiones=sesiones_bursatiles_verificadas,
+    baseline_por_ventana=operaciones_baseline,
+    candidata_por_ventana=operaciones_candidata,
+    auditar_riesgo=True,
+)
+```
+
+Esta comprobación examina **solo operaciones cerradas y declaradas**.
+No reconstruye el patrimonio dinámico, stops, órdenes, fills, posiciones
+omitidas ni riesgo de gap; no reemplaza controles preventivos de ejecución.
+El pico se calcula por ventana, no como auditoría de datos de mercado.
+
 ## Límites
 
 La comparación no verifica que los hashes declarados correspondan a archivos
