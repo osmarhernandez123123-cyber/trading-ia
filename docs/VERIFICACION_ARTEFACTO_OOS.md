@@ -40,10 +40,14 @@ resumen = verificar_artefacto_oos(
 
 Además de los hashes, el verificador exige que las identidades de baseline y
 candidata coincidan con el plan y que las fechas, conteos y totales declarados
-por ventana concuerden entre la comparación y sus dos resúmenes. Rechaza
+por ventana concuerden entre la comparación y sus dos resúmenes. También
+exige que las medias R declaradas en cada resumen coincidan con la comparación
+y que la diferencia descriptiva sea exactamente `media_candidata - media_baseline`
+cuando ambas ventanas tienen operaciones; si alguna está vacía, sus medias
+o la diferencia correspondiente deben ser `null` según corresponda. Rechaza
 informes con resúmenes ausentes o contradictorios aunque se haya recalculado
 el hash del archivo. **No reconstruye sesiones XNYS ni recalcula operaciones,
-PnL o rentabilidad**: una estructura coherente puede contener cifras falsas.
+PnL, medias R desde operaciones o rentabilidad**: una estructura coherente puede contener cifras falsas.
 El fixture de pruebas representa solo coherencia estructural sintética.
 
 ## Límites de seguridad y alcance
