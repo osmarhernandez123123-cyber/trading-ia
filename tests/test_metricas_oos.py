@@ -118,3 +118,25 @@ def test_salida_simultanea_se_agrega_sin_drawdown_artificial():
 def test_rechaza_columnas_faltantes():
     with pytest.raises(ValueError, match="Columnas"):
         evaluar_prueba(operaciones().drop(columns=["R"]), ventana())
+
+
+@pytest.mark.parametrize("campo,valor", [
+    ("pnl_usd", "100.0"),
+    ("riesgo_total", "100.0"),
+    ("R", True),
+    ("pnl_usd", False),
+])
+def test_rechaza_coercion_de_texto_y_booleanos_en_metricas(campo, valor):
+    df = operaciones().iloc[[0]].copy()
+    df[campo] = pd.Series([valor], index=df.index, dtype="object")
+    with pytest.raises(ValueError, match="valores numéricos"):
+        evaluar_prueba(df, ventana())
+
+
+def test_rechaza_desbordamiento_de_suma_aunque_trades_sean_finitos():
+    df = operaciones().iloc[:2].copy()
+    df["pnl_usd"] = [1e308, 1e308]
+    df["riesgo_total"] = [1.0, 1.0]
+    df["R"] = [1e308, 1e308]
+    with pytest.raises(ValueError, match="agregadas no finitas"):
+        evaluar_prueba(df, ventana())
