@@ -36,6 +36,16 @@ resumen = verificar_artefacto_oos(
 )
 ```
 
+## Coherencia estructural de la comparación
+
+Además de los hashes, el verificador exige que las identidades de baseline y
+candidata coincidan con el plan y que las fechas, conteos y totales declarados
+por ventana concuerden entre la comparación y sus dos resúmenes. Rechaza
+informes con resúmenes ausentes o contradictorios aunque se haya recalculado
+el hash del archivo. **No reconstruye sesiones XNYS ni recalcula operaciones,
+PnL o rentabilidad**: una estructura coherente puede contener cifras falsas.
+El fixture de pruebas representa solo coherencia estructural sintética.
+
 ## Límites de seguridad y alcance
 
 La verificación confirma que **el reporte no cambió respecto a la huella
