@@ -18,7 +18,11 @@ print(reporte["estresado"]["expectativa_r"])
 ```
 
 Cada operación debe tener las columnas de `evaluar_prueba` y `nocional`
-positivo, finito y en USD. Se calcula:
+positivo, finito y en USD. `nocional` debe ser un valor numérico explícito:
+se rechazan textos numéricos y booleanos, incluso si se podrían convertir a
+`float`. También se rechazan costes no finitos por operación o por suma de
+operaciones; se calcula primero el factor en bps para evitar desbordamientos
+intermedios innecesarios en nocionales grandes. Se calcula:
 
 ```text
 coste_extra_usd = 2 * nocional_entrada_usd * coste_extra_bps_lado / 10000
