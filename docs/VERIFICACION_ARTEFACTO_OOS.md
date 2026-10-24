@@ -47,7 +47,8 @@ cuando ambas ventanas tienen operaciones; si alguna está vacía, sus medias
 o la diferencia correspondiente deben ser `null` según corresponda. Rechaza
 informes con resúmenes ausentes o contradictorios aunque se haya recalculado
 el hash del archivo. **No reconstruye sesiones XNYS ni recalcula operaciones,
-PnL, medias R desde operaciones o rentabilidad**: una estructura coherente puede contener cifras falsas.
+PnL, medias R desde operaciones o rentabilidad**: una estructura coherente
+puede contener cifras falsas.
 El fixture de pruebas representa solo coherencia estructural sintética.
 
 ## Límites de seguridad y alcance
