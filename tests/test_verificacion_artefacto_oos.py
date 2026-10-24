@@ -33,7 +33,24 @@ def artefacto():
         "schema_version": 1,
         "plan_sha256": registro["plan_sha256"],
         "plan": registro["plan"],
-        "comparacion": {"ventanas": []},
+        "comparacion": {
+            "schema_version": 1,
+            "id_baseline": "V3.1",
+            "id_candidata": "prueba",
+            "baseline": {
+                "ventanas": 1, "operaciones": 0,
+                "por_ventana": [{"inicio_prueba": "2026-01-05",
+                                 "fin_prueba": "2026-01-30", "operaciones": 0}],
+            },
+            "candidata": {
+                "ventanas": 1, "operaciones": 0,
+                "por_ventana": [{"inicio_prueba": "2026-01-05",
+                                 "fin_prueba": "2026-01-30", "operaciones": 0}],
+            },
+            "por_ventana": [{"inicio_prueba": "2026-01-05",
+                             "fin_prueba": "2026-01-30",
+                             "operaciones_baseline": 0, "operaciones_candidata": 0}],
+        },
         "advertencia": "datos enteramente sintéticos",
     }
     contenido = json.dumps(reporte, ensure_ascii=False, sort_keys=True).encode()
@@ -149,3 +166,63 @@ def test_cli_local_solo_emite_huellas_y_no_contenido(tmp_path, capsys):
     assert str(ruta) not in salida
     assert "sintéticos" not in salida
     assert ruta.read_bytes() == contenido
+
+
+def _revalidar_mutacion(cambio, mensaje):
+    contenido, hashes = artefacto()
+    reporte = json.loads(contenido)
+    cambio(reporte)
+    alterado = json.dumps(reporte, ensure_ascii=False, sort_keys=True).encode()
+    # Incluso con el hash del archivo recalculado, la estructura debe fallar.
+    hashes["reporte_sha256_esperado"] = hashlib.sha256(alterado).hexdigest()
+    with pytest.raises(ValueError, match=mensaje):
+        verificar_artefacto_oos(alterado, **hashes)
+
+
+@pytest.mark.parametrize("campo", ["id_baseline", "id_candidata"])
+def test_rechaza_identidad_de_estrategia_distinta_del_plan(campo):
+    _revalidar_mutacion(
+        lambda reporte: reporte["comparacion"].__setitem__(campo, "otra-estrategia"),
+        "Identificadores de comparación",
+    )
+
+
+def test_rechaza_conteos_contradictorios_entre_resumenes():
+    _revalidar_mutacion(
+        lambda reporte: reporte["comparacion"]["por_ventana"][0].__setitem__(
+            "operaciones_baseline", 1
+        ),
+        "Conteos por ventana baseline",
+    )
+
+
+def test_rechaza_fechas_de_bloques_inconsistentes():
+    _revalidar_mutacion(
+        lambda reporte: reporte["comparacion"]["candidata"]["por_ventana"][0].__setitem__(
+            "fin_prueba", "2026-01-29"
+        ),
+        "Fechas por ventana candidata",
+    )
+
+
+def test_rechaza_totales_inconsistentes():
+    _revalidar_mutacion(
+        lambda reporte: reporte["comparacion"]["baseline"].__setitem__("operaciones", 1),
+        "Total de operaciones baseline",
+    )
+
+
+def test_rechaza_limites_de_comparacion_distintos_del_plan():
+    _revalidar_mutacion(
+        lambda reporte: reporte["comparacion"]["por_ventana"][0].__setitem__(
+            "inicio_prueba", "2026-01-06"
+        ),
+        "Límites de comparación",
+    )
+
+
+def test_rechaza_comparacion_incompleta_aunque_tenga_hash_valido():
+    _revalidar_mutacion(
+        lambda reporte: reporte["comparacion"].pop("baseline"),
+        "Resumen baseline ausente",
+    )

@@ -50,6 +50,48 @@ def _exigir_finitos(raiz: object) -> None:
             pendientes.extend(valor)
 
 
+
+def _verificar_consistencia_comparacion(comparacion: dict, plan: dict) -> None:
+    """Contrasta etiquetas y resúmenes internos; no recalcula operaciones."""
+    if type(comparacion.get("schema_version")) is not int or comparacion["schema_version"] != 1:
+        raise ValueError("Versión de comparación OOS inválida")
+    if (comparacion.get("id_baseline") != plan["baseline_id"]
+            or comparacion.get("id_candidata") != plan["candidata_id"]):
+        raise ValueError("Identificadores de comparación no coinciden con el plan")
+
+    filas = comparacion.get("por_ventana")
+    if not isinstance(filas, list) or not filas or any(not isinstance(f, dict) for f in filas):
+        raise ValueError("Ventanas de comparación ausentes o inválidas")
+    if (filas[0].get("inicio_prueba") != plan["inicio_prueba"]
+            or filas[-1].get("fin_prueba") != plan["fin_prueba"]):
+        raise ValueError("Límites de comparación no coinciden con el plan")
+
+    for nombre in ("baseline", "candidata"):
+        agregado = comparacion.get(nombre)
+        if not isinstance(agregado, dict) or not isinstance(agregado.get("por_ventana"), list):
+            raise ValueError(f"Resumen {nombre} ausente o inválido")
+        bloques = agregado["por_ventana"]
+        if (type(agregado.get("ventanas")) is not int
+                or agregado["ventanas"] != len(filas) or len(bloques) != len(filas)
+                or type(agregado.get("operaciones")) is not int
+                or agregado["operaciones"] < 0):
+            raise ValueError(f"Totales de ventanas {nombre} inconsistentes")
+        suma = 0
+        for fila, bloque in zip(filas, bloques):
+            if not isinstance(bloque, dict) or any(
+                fila.get(campo) != bloque.get(campo)
+                for campo in ("inicio_prueba", "fin_prueba")
+            ):
+                raise ValueError(f"Fechas por ventana {nombre} inconsistentes")
+            cantidad = bloque.get("operaciones")
+            if (type(cantidad) is not int or cantidad < 0
+                    or fila.get(f"operaciones_{nombre}") != cantidad
+                    or type(fila.get(f"operaciones_{nombre}")) is not int):
+                raise ValueError(f"Conteos por ventana {nombre} inconsistentes")
+            suma += cantidad
+        if suma != agregado["operaciones"]:
+            raise ValueError(f"Total de operaciones {nombre} inconsistente")
+
 def verificar_artefacto_oos(
     contenido: bytes,
     *,
@@ -88,6 +130,7 @@ def verificar_artefacto_oos(
     if not isinstance(plan, dict):
         raise ValueError("Falta plan registrado en reporte")
     registro = registrar_plan_oos(plan)
+    _verificar_consistencia_comparacion(reporte["comparacion"], registro["plan"])
     huella_plan = _sha(reporte.get("plan_sha256"), "plan_sha256 del reporte")
     if (not hmac.compare_digest(huella_plan, registro["plan_sha256"])
             or not hmac.compare_digest(huella_plan, esperado_plan)):
