@@ -56,3 +56,38 @@ Thumbs.db
 # Ejecuciones locales: pueden contener procedencia restringida y rutas privadas.
 work/
 artefactos/
+
+# Exportaciones de broker, cuentas y datos locales adicionales
+# Las muestras publicables deben revisarse individualmente antes de versionarse.
+*.csv
+*.tsv
+*.xls
+*.xlsx
+*.sqlite
+*.sqlite3
+*.db
+*.db-wal
+*.db-shm
+*.jsonl
+*.ndjson
+*.feather
+*.arrow
+*.h5
+*.hdf5
+*.pkl
+*.pickle
+*.joblib
+*.npy
+*.npz
+*.bak
+*.backup
+
+# Archivos de seguridad y volcados accidentales
+*.env.bak
+*.env.backup
+*.keystore
+*.jks
+*.asc
+*.gpg
+*.age
+*.dump
